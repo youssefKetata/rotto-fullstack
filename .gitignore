@@ -41,5 +41,6 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-data
-data/*
+/data/*
+!/data/candidates.json
+/candidates.json

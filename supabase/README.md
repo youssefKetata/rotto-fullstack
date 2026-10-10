@@ -60,8 +60,8 @@ Global signup is disabled; the email provider remains enabled for password login
 | Globex  | recruiter@globex.test | rotto-assessment |
 
 The script obtains local connection details from the pinned Supabase CLI without
-printing secret keys. Set `CANDIDATES_PATH` to use a different input file. Keep
-the JSON files Git-ignored. Rerunning refreshes supplied candidate profiles and
+printing secret keys. Set `CANDIDATES_PATH` to use a different input file. Only
+the supplied candidate dataset is included in Git. Rerunning refreshes profiles and
 histories, preserves their IDs, and does not reset usage, billing, or shortlists.
 The database import is transactional; Auth account creation is a separate API
 operation and can be recovered by rerunning the seed.
