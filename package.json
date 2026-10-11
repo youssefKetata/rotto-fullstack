@@ -8,12 +8,18 @@
     "start": "next start",
     "lint": "eslint",
     "test:db": "node --test tests/database/schema.test.mjs",
+    "test:connection": "node --conditions=react-server --import tsx --test tests/supabase/connection.test.ts",
+    "test:auth-unit": "node --conditions=react-server --import tsx --test tests/supabase/auth-response.test.ts",
+    "test:auth": "node --test tests/supabase/login.test.mjs",
     "db:seed": "node scripts/seed.mjs"
   },
   "dependencies": {
+    "@supabase/ssr": "0.12.7",
+    "@supabase/supabase-js": "2.117.3",
     "next": "16.4.0",
     "react": "19.3.0",
-    "react-dom": "19.3.0"
+    "react-dom": "19.3.0",
+    "server-only": "0.0.1"
   },
   "devDependencies": {
     "@electric-sql/pglite": "0.5.8",
@@ -27,6 +33,7 @@
     "prettier": "3.9.9",
     "supabase": "2.119.0",
     "tailwindcss": "^4",
+    "tsx": "4.23.15",
     "typescript": "^5"
   },
   "engines": {

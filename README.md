@@ -21,10 +21,16 @@ existing searches, shortlists, billing, and consumed free searches.
 
 The app runs at http://localhost:3000. Studio runs at http://127.0.0.1:54323.
 Sign in as `recruiter@acme.test` or `recruiter@globex.test`, both with password
-`rotto-assessment`. Application sign-in and search are not implemented yet.
+`rotto-assessment`. The login page is at `/login`; signing in opens a protected
+company workspace with sign-out. Search and the assessment data APIs are next.
 
 The model provider key and `STRIPE_WEBHOOK_SECRET` must come from environment
 variables (or `.env.local`); setup does not invent values for them.
 
-Checks: `npm run lint` and `npm run test:db`.
+Checks: `npm run lint`, `npm run test:db`, and `npm run test:connection`
+(the latter needs local Supabase running after setup).
+`npm run test:auth-unit` checks origin validation without running services.
+With `make dev` running, `npm run test:auth` checks login/logout, Proxy redirects,
+and recruiter access. It creates and removes a temporary local Auth account to
+check the missing-membership case.
 Database details: [supabase/README.md](supabase/README.md).
