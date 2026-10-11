@@ -1,50 +1,69 @@
 # Rotto assessment
 
-Requires Node 24, npm, Make, and Docker Desktop running with `docker` on PATH.
-Supabase CLI 2.119.0 is installed from the lockfile; no global CLI is needed.
-
-The supplied candidate dataset is included at `data/candidates.json` so a fresh
-clone needs no data-copying step. To override it, put `candidates.json` in the
-repository root or set `CANDIDATES_PATH` to another file. Other assessment files
-and override datasets remain Git-ignored.
+Use Node 24, npm, Make and Docker Desktop. Supabase **2.119.0** and Next.js
+**16.4.0** are locked; no global CLI is needed.
 
 ```sh
 make setup
 make dev
 ```
 
-Setup installs locked dependencies, starts local Supabase, applies pending
-migrations, loads all candidates, and creates both recruiters. It generates
-Git-ignored `.env.local` with the local URL, publishable key, server secret key,
-and database URL, preserving unrelated settings. Repeating setup preserves
-existing searches, shortlists, billing, and consumed free searches.
+Setup starts Supabase, applies migrations, imports
+5,000 candidates, and creates `recruiter@acme.test` and
+`recruiter@globex.test` (password: `rotto-assessment`). Open
+[localhost:3000](http://localhost:3000). Repeating setup preserves searches,
+shortlists, billing and consumed allowance. It preserves provider settings in
+ignored `.env.local`; supply `GEMINI_API_KEY` and `STRIPE_WEBHOOK_SECRET` through
+the environment or that file. The supplied webhook fixture secret is
+`whsec_rotto_assessment_sample`. No Stripe account or checkout is needed.
 
-The app runs at http://localhost:3000. Studio runs at http://127.0.0.1:54323.
-Sign in as `recruiter@acme.test` or `recruiter@globex.test`, both with password
-`rotto-assessment`. The login page is at `/login`; signing in opens a protected
-company workspace with sign-out. The current UI preview includes a brief,
-editable filters, real database results (20 at a time), candidate profiles and
-a shortlist saved in the current browser tab. Reload restores the preview
-without submitting a search. Storage is scoped to the company and recruiter.
+Search uses one direct request to free-tier **Gemini 3.5 Flash-Lite**, with no
+retries or paid fallback. Interpretation has a 15-second deadline to allow for
+first-connection setup and provider latency; the search reservation lasts 30
+seconds so completion can finish within its lease. Only the brief, distinct
+database vocabulary and interpretation rules go to Google. Candidate profiles
+stay in Postgres. Gemini returns JSON; strict server validation accepts only
+known fields, canonical values, bounded ranges and consistent criteria. The
+prompt and a second guard report unsupported requirements explicitly. A required
+unverifiable condition gives zero verified matches. The model never writes SQL.
 
-The preview uses explicit keyword recognition and authenticated read-only
-`/api/preview/candidates` routes. It does not call a model or consume quota.
-Only displayed filters apply; selected skills use AND semantics. The remaining
-assessment integration includes Gemini interpretation, atomic search limits,
-persisted result snapshots, named company shortlists, saved briefs, Bearer-auth
-data APIs and signed Stripe webhooks. No provider key is used by this preview.
+SQL applies AND within each group, OR between groups, exclusions, same-record
+work/education conditions, and optional preferences. Preferences rank first,
+then experience and candidate ID. Every match is stored with a stable position;
+20-result pages read that snapshot. The UI displays all criteria and issues,
+stages edits, and persists named company shortlists and saved briefs.
 
-The model provider key and `STRIPE_WEBHOOK_SECRET` must come from environment
-variables (or `.env.local`); setup does not invent values for them.
+**Structure:** Search components render the workspace; dedicated hooks own
+actions, shortlists and session restoration. `src/lib/search` holds shared
+contracts, interpretation, parameterized SQL and transaction services. A server-only
+Postgres pool uses `DATABASE_URL`; business logic lives in TypeScript. Supabase
+clients use generated types; regenerate after migrations with `npm run db:types`.
 
-Checks: `npm run lint`, `npm run test:db`, and `npm run test:connection`
-(the latter needs local Supabase running after setup).
-`npm run test:auth-unit` checks origin validation without running services.
-With `make dev` running, `npm run test:auth` checks login/logout, Proxy redirects,
-and recruiter access. It creates and removes a temporary local Auth account to
-check the missing-membership case.
-Database details: [supabase/README.md](supabase/README.md).
+Company locks, attempt leases and idempotency keys enforce one lifetime free
+search, including concurrent requests, refinements and saved-brief reruns.
+Completed zero-result searches count; technical failures release the allowance.
+Paging, reloads, profiles and saving do not count. Bearer APIs verify the user
+with Supabase Auth; RLS protects company records even through direct Supabase
+calls. Privileged writes and secrets remain server-only. Webhooks verify raw
+bytes, deduplicate event IDs, and apply only newer subscription events.
 
-`npm run test:search-unit` checks preview interpretation and filter validation.
-`npm run test:search-preview` verifies authenticated reads, database filtering,
-profile relations and paging against the supplied dataset (needs both services).
+**Cost:** $0 per search on the configured free tier while its quota is available.
+Billing stays disabled; provider limits yield an error and restore allowance.
+[Model documentation](https://ai.google.dev/gemini-api/docs/models/gemini-3.5-flash-lite).
+
+**Validation:** `npm run lint`, `npm run typecheck`, `npm run format:check`,
+`npm run build`, `npm run test:http`, `npm run test:db`,
+`npm run test:search-unit`, `npm run test:auth-unit`, `npm run test:connection`,
+`npm run test:auth`, and `npm run test:api`. Service tests use disposable accounts;
+seeded allowances are preserved. Opt-in live evaluation is
+`ROTTO_LIVE_GEMINI=1 node --env-file=.env.local --conditions=react-server --import tsx tests/search/live.ts`.
+Ten supplied briefs matched their exact expected sets in the prior live run.
+A prior live search took 2.05 seconds. The latest production paging run
+(234 pages) measured p50 116 ms and p95 181 ms.
+
+**Tradeoffs:** JSON mode plus application validation avoids a provider rejection
+of the larger output schema. Unsupported requirements conservatively block the
+whole search. Archived fixture signatures have no age expiry; deduplication and
+event ordering still apply. With another week: broader paraphrase/logic
+evaluation, branch-specific unsupported conditions, webhook timestamp checks,
+and broader latency measurements.

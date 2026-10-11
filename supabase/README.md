@@ -60,8 +60,8 @@ Global signup is disabled; the email provider remains enabled for password login
 | Globex  | recruiter@globex.test | rotto-assessment |
 
 The script obtains local connection details from the pinned Supabase CLI without
-printing secret keys. Set `CANDIDATES_PATH` to use a different input file. Only
-the supplied candidate dataset is included in Git. Rerunning refreshes profiles and
+printing secret keys. Set `CANDIDATES_PATH` to use a different input file. The
+supplied candidate dataset and reference-query test fixture are included in Git. Rerunning refreshes profiles and
 histories, preserves their IDs, and does not reset usage, billing, or shortlists.
 The database import is transactional; Auth account creation is a separate API
 operation and can be recovered by rerunning the seed.
@@ -76,8 +76,11 @@ fresh cookie client for each Server Component, Server Action, or Route Handler.
 Both use only `NEXT_PUBLIC_SUPABASE_URL` and
 `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, written by `make setup`. Configuration is
 checked when creating a client, so missing settings give a useful error without
-printing values. `SUPABASE_SECRET_KEY` and `DATABASE_URL` are reserved for future
-server operations; this connection layer does not use them or need an admin client.
+printing values. `DATABASE_URL` is used by the server-only Postgres pool for
+search/quota and webhook transactions, as well as local seed and integration tests.
+`SUPABASE_SECRET_KEY` is used by local account setup and integration fixtures.
+Recruiter IDs are verified through Auth before privileged search operations;
+the transaction resolves and locks their database membership and company usage.
 
 `src/proxy.ts` refreshes cookie sessions and forwards updated cookies to both the
 server render and browser. Session responses use `Cache-Control: private, no-store`.
@@ -127,12 +130,24 @@ It checks both recruiter tokens, RLS identity, rejected credentials, and cookie
 refresh forwarding. These tests sign in and refresh sessions but do not change
 application data.
 
-Run `npm run test:db` with Node 24. Tests apply the actual migrations to embedded
-Postgres (PGlite), with minimal stand-ins for Supabase's auth table/function and
-roles. They verify company isolation, permissions, company-owned writes, seed
-reruns, and import rollback without Docker. They do not exercise Supabase Auth,
-PostgREST, or concurrent quota/webhook processing.
+Run `npm run test:db` with Node 24 after `make setup`, with local Supabase running.
+Schema/RLS tests apply real migrations to embedded Postgres (PGlite).
+Server transaction tests use disposable identities in local Postgres and cover
+quota, rollback, ownership, same-record predicates, exact reference sets,
+ordered snapshots, and simultaneous admission/completion. Seeded company data is preserved.
 
-The migration has also been applied to local Supabase. Atomic quota/billing
-functions remain separate next steps; their workflows are not implemented by
-this schema alone.
+`20261011160000_search_execution.sql` adds only a private attempt ledger and index.
+`20261011180000_remove_business_functions.sql` removes previously installed search
+and billing RPCs. The former uncommitted billing migration was reverted locally.
+Search admission, completion, failure recovery and matching now live in
+`src/lib/search/database.ts` and `query.ts`; subscription updates live in
+`src/lib/billing.ts`. They use short Postgres transactions and the same company
+lock. Gemini runs between transactions. Expired attempts release reservations;
+replayed request keys return the completed snapshot. Billing events deduplicate
+by ID and apply newer state, with cancellation winning equal-second ties.
+
+`npm run test:api` uses disposable companies and actual Bearer requests through
+Next.js and PostgREST. It checks direct-token isolation, named shortlist writes,
+saved briefs, every result page, free usage, signed event ordering and cancellation.
+Set `ROTTO_TEST_BASE_URL` to test a production server on another local port.
+`ROTTO_LIVE_GEMINI=1` additionally enables one free-tier end-to-end model request.
