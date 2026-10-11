@@ -1,0 +1,60 @@
+.workspace-page {
+  min-height: 100svh;
+  padding: 32px 6vw;
+}
+.workspace-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 25px;
+  border-bottom: 1px solid var(--border);
+}
+.welcome-card {
+  margin: 100px auto 0;
+  max-width: 620px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  padding: 46px;
+}
+.welcome-card h1 {
+  font-size: 36px;
+  letter-spacing: -1.5px;
+  font-weight: 500;
+  line-height: 1.2;
+  margin: 0 0 13px;
+}
+.welcome-card > p {
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--muted);
+}
+.workspace-loading {
+  min-height: 100svh;
+  display: grid;
+  place-items: center;
+  text-align: center;
+  padding: 24px;
+}
+.workspace-loading h1 {
+  font-size: 27px;
+  margin-bottom: 12px;
+}
+.workspace-loading button {
+  margin-top: 22px;
+}
+.muted {
+  color: var(--muted);
+}
+@media (max-width: 700px) {
+  .workspace-page {
+    padding: 24px;
+  }
+  .welcome-card {
+    margin-top: 65px;
+    padding: 30px 24px;
+  }
+  .welcome-card h1 {
+    font-size: 30px;
+  }
+}

@@ -128,7 +128,8 @@ test("both seeded recruiters get their own workspace and can sign out", async ()
     const workspace = await fetch(base, { headers: { Cookie: cookie } });
     assert.equal(workspace.status, 200);
     const html = (await workspace.text()).replace(/<!--.*?-->/gs, "");
-    assert.ok(html.includes(`Welcome to ${name}.`));
+    assert.ok(html.includes(`${name} account`));
+    assert.ok(html.includes("Describe who"));
 
     const logout = await fetch(`${base}/api/auth/logout`, {
       method: "POST",

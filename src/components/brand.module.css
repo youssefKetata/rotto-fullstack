@@ -1,0 +1,15 @@
+.brand {
+  display: inline-flex;
+  align-items: center;
+  font-size: 33px;
+  font-weight: 650;
+  letter-spacing: -1.6px;
+}
+.brand svg {
+  width: 29px;
+  height: 29px;
+  margin-right: 10px;
+}
+.brand-dot {
+  color: var(--brand-dot, currentColor);
+}

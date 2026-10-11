@@ -1,5 +1,8 @@
 "use client";
 
+import controls from "./controls.module.css";
+import styles from "./login-form.module.css";
+
 import { useState, type FormEvent } from "react";
 
 export function LoginForm() {
@@ -41,8 +44,12 @@ export function LoginForm() {
   }
 
   return (
-    <form onSubmit={signIn} className="login-form" aria-busy={pending}>
-      <div className="field">
+    <form
+      onSubmit={signIn}
+      className={styles["login-form"]}
+      aria-busy={pending}
+    >
+      <div className={styles["field"]}>
         <label htmlFor="email">Email address</label>
         <input
           id="email"
@@ -55,9 +62,9 @@ export function LoginForm() {
           disabled={pending}
         />
       </div>
-      <div className="field">
+      <div className={styles["field"]}>
         <label htmlFor="password">Password</label>
-        <div className="password-field">
+        <div className={styles["password-field"]}>
           <input
             id="password"
             name="password"
@@ -70,7 +77,7 @@ export function LoginForm() {
           />
           <button
             type="button"
-            className="password-toggle"
+            className={styles["password-toggle"]}
             onClick={() => setShowPassword(!showPassword)}
             aria-label={showPassword ? "Hide password" : "Show password"}
             aria-pressed={showPassword}
@@ -81,32 +88,44 @@ export function LoginForm() {
         </div>
       </div>
       {error && (
-        <p className="form-error" role="alert">
+        <p className={controls["form-error"]} role="alert">
           {error}
         </p>
       )}
       <button
         type="submit"
-        className="primary-button sign-in-button"
+        className={styles["primary-button"] + " " + styles["sign-in-button"]}
         data-pending={pending}
         disabled={pending}
         aria-label={pending ? "Signing in" : "Sign in"}
       >
-        <span className="sign-in-label" aria-live="polite" aria-atomic="true">
-          <span className="sign-in-idle" aria-hidden={pending}>
+        <span
+          className={styles["sign-in-label"]}
+          aria-live="polite"
+          aria-atomic="true"
+        >
+          <span className={styles["sign-in-idle"]} aria-hidden={pending}>
             Sign in
           </span>
-          <span className="sign-in-progress" aria-hidden={!pending}>
+          <span className={styles["sign-in-progress"]} aria-hidden={!pending}>
             {status === "navigating" ? "Opening workspace…" : "Signing in…"}
           </span>
         </span>
-        <span className="sign-in-icon" aria-hidden="true">
-          <svg className="sign-in-arrow" viewBox="0 0 24 24" fill="none">
+        <span className={styles["sign-in-icon"]} aria-hidden="true">
+          <svg
+            className={styles["sign-in-arrow"]}
+            viewBox="0 0 24 24"
+            fill="none"
+          >
             <path d="M5 12h14m-6-6 6 6-6 6" />
           </svg>
-          <svg className="sign-in-spinner" viewBox="0 0 24 24" fill="none">
-            <circle className="spinner-track" cx="12" cy="12" r="9" />
-            <circle className="spinner-arc" cx="12" cy="12" r="9" />
+          <svg
+            className={styles["sign-in-spinner"]}
+            viewBox="0 0 24 24"
+            fill="none"
+          >
+            <circle className={styles["spinner-track"]} cx="12" cy="12" r="9" />
+            <circle className={styles["spinner-arc"]} cx="12" cy="12" r="9" />
           </svg>
         </span>
       </button>

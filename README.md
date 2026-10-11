@@ -22,7 +22,17 @@ existing searches, shortlists, billing, and consumed free searches.
 The app runs at http://localhost:3000. Studio runs at http://127.0.0.1:54323.
 Sign in as `recruiter@acme.test` or `recruiter@globex.test`, both with password
 `rotto-assessment`. The login page is at `/login`; signing in opens a protected
-company workspace with sign-out. Search and the assessment data APIs are next.
+company workspace with sign-out. The current UI preview includes a brief,
+editable filters, real database results (20 at a time), candidate profiles and
+a shortlist saved in the current browser tab. Reload restores the preview
+without submitting a search. Storage is scoped to the company and recruiter.
+
+The preview uses explicit keyword recognition and authenticated read-only
+`/api/preview/candidates` routes. It does not call a model or consume quota.
+Only displayed filters apply; selected skills use AND semantics. The remaining
+assessment integration includes Gemini interpretation, atomic search limits,
+persisted result snapshots, named company shortlists, saved briefs, Bearer-auth
+data APIs and signed Stripe webhooks. No provider key is used by this preview.
 
 The model provider key and `STRIPE_WEBHOOK_SECRET` must come from environment
 variables (or `.env.local`); setup does not invent values for them.
@@ -34,3 +44,7 @@ With `make dev` running, `npm run test:auth` checks login/logout, Proxy redirect
 and recruiter access. It creates and removes a temporary local Auth account to
 check the missing-membership case.
 Database details: [supabase/README.md](supabase/README.md).
+
+`npm run test:search-unit` checks preview interpretation and filter validation.
+`npm run test:search-preview` verifies authenticated reads, database filtering,
+profile relations and paging against the supplied dataset (needs both services).

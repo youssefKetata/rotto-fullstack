@@ -1,0 +1,178 @@
+.login-form {
+  margin-top: 35px;
+}
+.field {
+  margin-bottom: 22px;
+}
+.field label {
+  display: block;
+  margin-bottom: 9px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.field input {
+  display: block;
+  width: 100%;
+  height: 50px;
+  padding: 0 15px;
+  color: var(--foreground);
+  border: 1px solid var(--control-border);
+  border-radius: 8px;
+  background: #fff;
+  font-size: 13px;
+  transition:
+    border-color 150ms,
+    box-shadow 150ms;
+}
+.field input::placeholder {
+  color: var(--muted);
+}
+.field input:focus {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+  border-color: var(--foreground);
+}
+.field input:disabled {
+  opacity: 0.7;
+}
+.password-field {
+  position: relative;
+}
+.password-field input {
+  padding-right: 68px;
+}
+.password-toggle {
+  position: absolute;
+  inset: 3px 4px 3px auto;
+  width: 58px;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 11px;
+  border-radius: 5px;
+}
+.primary-button {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 50px;
+  border: 0;
+  border-radius: 8px;
+  background: #294c3c;
+  color: #f7f8ef;
+  font-size: 13px;
+  font-weight: 550;
+  transition: background 150ms;
+}
+.primary-button:hover {
+  background: #1d3b2d;
+}
+.primary-button:disabled {
+  opacity: 0.7;
+}
+.sign-in-button {
+  position: relative;
+  overflow: hidden;
+  justify-content: space-between;
+  padding: 0 17px;
+  margin-top: 9px;
+  transition:
+    background 180ms,
+    box-shadow 180ms,
+    transform 180ms;
+}
+.sign-in-button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 5px 12px #244a3b20;
+}
+.sign-in-button:active:not(:disabled) {
+  transform: translateY(0) scale(0.99);
+  box-shadow: none;
+}
+.sign-in-button:disabled {
+  opacity: 1;
+  background: #345744;
+}
+.sign-in-label,
+.sign-in-icon {
+  display: grid;
+}
+.sign-in-label > span,
+.sign-in-icon > svg {
+  grid-area: 1 / 1;
+  transition:
+    opacity 180ms,
+    transform 180ms;
+}
+.sign-in-icon {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+}
+.sign-in-icon svg {
+  width: 20px;
+  height: 20px;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.sign-in-progress,
+.sign-in-spinner {
+  opacity: 0;
+}
+.sign-in-progress {
+  transform: translateY(5px);
+}
+.sign-in-button:hover:not(:disabled) .sign-in-arrow {
+  transform: translateX(3px);
+}
+.sign-in-button[data-pending="true"] .sign-in-idle {
+  opacity: 0;
+  transform: translateY(-5px);
+}
+.sign-in-button[data-pending="true"] .sign-in-arrow {
+  opacity: 0;
+}
+.sign-in-button[data-pending="true"] .sign-in-progress {
+  opacity: 1;
+  transform: translateY(0);
+}
+.sign-in-button[data-pending="true"] .sign-in-spinner {
+  opacity: 1;
+  animation: spin 800ms linear infinite;
+}
+.spinner-track {
+  opacity: 0.2;
+}
+.spinner-arc {
+  stroke-dasharray: 40 57;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sign-in-button,
+  .sign-in-label > span,
+  .sign-in-icon > svg {
+    transition: none;
+  }
+  .sign-in-button:hover:not(:disabled),
+  .sign-in-button:active:not(:disabled),
+  .sign-in-button:hover:not(:disabled) .sign-in-arrow {
+    transform: none;
+  }
+  .sign-in-button[data-pending="true"] .sign-in-spinner {
+    animation: none;
+  }
+}
+
+@media (max-width: 700px) {
+  .field input {
+    font-size: 16px;
+  }
+}

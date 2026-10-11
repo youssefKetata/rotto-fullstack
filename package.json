@@ -11,12 +11,16 @@
     "test:connection": "node --conditions=react-server --import tsx --test tests/supabase/connection.test.ts",
     "test:auth-unit": "node --conditions=react-server --import tsx --test tests/supabase/auth-response.test.ts",
     "test:auth": "node --test tests/supabase/login.test.mjs",
+    "test:search-unit": "node --import tsx --test tests/search/filters.test.ts",
+    "test:search-preview": "node --test tests/search/preview.test.mjs",
     "db:seed": "node scripts/seed.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "0.12.7",
     "@supabase/supabase-js": "2.117.3",
+    "clsx": "^2.1.1",
     "next": "16.4.0",
+    "radix-ui": "^1.7.0",
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "server-only": "0.0.1"

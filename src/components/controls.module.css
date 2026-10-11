@@ -1,0 +1,26 @@
+.secondary-button {
+  padding: 10px 17px;
+  background: transparent;
+  border: 1px solid var(--control-border);
+  min-height: 44px;
+  border-radius: 7px;
+  font-size: 12px;
+}
+.secondary-button:hover {
+  background: #edf1e6;
+}
+.logout-control {
+  text-align: right;
+}
+.logout-control .form-error {
+  margin: 10px 0 0;
+}
+.form-error {
+  padding: 10px 12px;
+  margin: 0 0 15px;
+  border-radius: 7px;
+  background: #f8eae4;
+  color: var(--danger);
+  font-size: 12px;
+  line-height: 1.6;
+}

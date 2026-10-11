@@ -1,0 +1,295 @@
+.section {
+  padding: clamp(36px, 9svh, 98px) 0 24px;
+  max-width: 720px;
+  margin: 0 auto;
+}
+.heading {
+  text-align: center;
+  margin-bottom: 36px;
+}
+.eyebrow {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 1.7px;
+  color: var(--muted);
+}
+.heading h1 {
+  font-size: clamp(34px, 4vw, 44px);
+  font-weight: 500;
+  letter-spacing: -1.9px;
+  line-height: 1.15;
+  margin: 18px 0;
+}
+.heading p {
+  font-size: 15px;
+  line-height: 1.7;
+  color: var(--muted);
+}
+.mobileBreak {
+  display: none;
+}
+.form {
+  background: var(--surface);
+  border: 1px solid var(--control-border);
+  border-radius: 12px;
+  padding: 22px 24px 16px;
+  transition: border-color 150ms;
+}
+.form:focus-within {
+  border-color: var(--foreground);
+  outline: 2px solid var(--ring);
+  outline-offset: 3px;
+}
+.form label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+.form textarea {
+  width: 100%;
+  display: block;
+  resize: none;
+  min-height: 112px;
+  max-height: 280px;
+  border: 0;
+  background: transparent;
+  font-size: 16px;
+  line-height: 1.65;
+  padding: 0;
+}
+.form textarea:focus-visible {
+  outline: none;
+}
+.form textarea::placeholder {
+  color: var(--muted);
+}
+.actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 12px;
+}
+.hint {
+  font-size: 11px;
+  color: var(--muted);
+}
+.hint kbd {
+  font-family: inherit;
+}
+.submit {
+  background: var(--accent);
+  border: 1px solid var(--foreground);
+  border-radius: 7px;
+  min-height: 46px;
+  padding: 0 18px;
+  font-weight: 600;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  transition: background 150ms;
+}
+.submit:hover:not(:disabled) {
+  background: #cce7a4;
+}
+.submit:disabled {
+  opacity: 0.65;
+}
+.examples {
+  margin-top: 28px;
+  text-align: center;
+}
+.examples > span {
+  display: block;
+  font-size: 12px;
+  color: var(--muted);
+  margin-bottom: 10px;
+}
+.examples > div {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+.examples button {
+  border: 1px solid var(--control-border);
+  border-radius: 6px;
+  background: transparent;
+  min-height: 44px;
+  padding: 0 12px;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.examples button:hover {
+  background: var(--hover);
+}
+.note {
+  margin-top: 24px;
+  color: var(--muted);
+  font-size: 12px;
+  text-align: center;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 16px;
+}
+.note button {
+  white-space: nowrap;
+  min-height: 44px;
+  background: transparent;
+  border: 0;
+  font-size: 12px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.compact {
+  max-width: none;
+  padding: 32px 0 0;
+}
+.briefBar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  border: 1px solid var(--control-border);
+  border-radius: 8px;
+  padding: 12px 16px;
+  background: var(--surface);
+}
+.briefBar > svg {
+  flex-shrink: 0;
+}
+.briefBar p {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+}
+.briefBar p > span:first-child {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+.briefBar p > span:last-child {
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 14px;
+}
+.briefBar button,
+.cancel {
+  flex-shrink: 0;
+  min-height: 44px;
+  background: transparent;
+  border: 0;
+  border-radius: 4px;
+  font-size: 12px;
+  padding: 0 8px;
+}
+.briefBar button:hover,
+.cancel:hover {
+  background: var(--hover);
+}
+.compact .heading {
+  text-align: left;
+  margin-bottom: 18px;
+}
+.compact .heading h1 {
+  font-size: 24px;
+  margin: 0;
+  letter-spacing: -0.7px;
+}
+.compact .form {
+  padding: 16px 20px 12px;
+}
+.compact textarea {
+  min-height: 52px;
+  font-size: 15px;
+}
+.compact .note {
+  margin: 4px 0 0;
+  justify-content: space-between;
+  text-align: left;
+}
+@media (min-width: 701px) and (max-height: 800px) {
+  .section:not(.compact) {
+    padding: 32px 0 20px;
+  }
+  .section:not(.compact) .heading {
+    margin-bottom: 24px;
+  }
+  .section:not(.compact) .heading h1 {
+    margin: 14px 0;
+  }
+  .examples {
+    margin-top: 20px;
+  }
+  .section:not(.compact) .note {
+    margin-top: 16px;
+  }
+}
+@media (max-width: 700px) {
+  .section {
+    padding-top: 62px;
+  }
+  .heading {
+    margin-bottom: 28px;
+  }
+  .heading h1 {
+    letter-spacing: -1.2px;
+  }
+  .heading p {
+    font-size: 14px;
+  }
+  .mobileBreak {
+    display: block;
+  }
+  .eyebrow {
+    font-size: 10px;
+    letter-spacing: 1.2px;
+  }
+  .form {
+    padding: 18px 18px 14px;
+  }
+  .form textarea {
+    min-height: 146px;
+  }
+  .hint {
+    display: none;
+  }
+  .submit {
+    width: 100%;
+    justify-content: space-between;
+  }
+  .examples > div {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .examples button {
+    justify-content: space-between;
+  }
+  .note {
+    font-size: 11px;
+  }
+  .compact {
+    padding-top: 28px;
+  }
+  .compact textarea {
+    min-height: 52px;
+    font-size: 16px;
+  }
+  .compact .note {
+    gap: 6px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .form,
+  .submit {
+    transition: none;
+  }
+}

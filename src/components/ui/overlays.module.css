@@ -1,0 +1,96 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  background: #233b3240;
+}
+.menu,
+.selectContent {
+  z-index: 60;
+  color: var(--foreground);
+  background: var(--surface);
+  border: 1px solid var(--control-border);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px #233b3210;
+  overflow: hidden;
+}
+.menu {
+  max-height: var(--radix-dropdown-menu-content-available-height);
+  overflow-y: auto;
+}
+.menuItem {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  outline: none;
+  user-select: none;
+}
+.menuItem[data-highlighted],
+.selectItem[data-highlighted] {
+  background: var(--accent-soft);
+}
+.menuItem[data-disabled],
+.selectItem[data-disabled] {
+  pointer-events: none;
+  opacity: 0.5;
+}
+.selectTrigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  padding: 8px 10px;
+  border: 1px solid var(--control-border);
+  border-radius: 5px;
+  background: var(--surface);
+  font-size: 13px;
+  font-weight: 400;
+  text-align: left;
+}
+.selectTrigger > span:first-child {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.selectTrigger svg {
+  flex-shrink: 0;
+}
+.selectTrigger:disabled {
+  opacity: 0.5;
+}
+.selectContent {
+  max-height: min(320px, var(--radix-select-content-available-height));
+  min-width: var(--radix-select-trigger-width);
+  max-width: calc(100vw - 24px);
+}
+.selectViewport {
+  padding: 4px;
+}
+.selectItem {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 8px 32px 8px 10px;
+  border-radius: 4px;
+  font-size: 13px;
+  line-height: 1.5;
+  outline: none;
+  cursor: pointer;
+  user-select: none;
+}
+.indicator {
+  position: absolute;
+  right: 10px;
+  display: flex;
+}
+.scrollButton {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 28px;
+  background: var(--surface);
+}

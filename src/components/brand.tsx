@@ -1,6 +1,7 @@
+import styles from "./brand.module.css";
 export function Brand() {
   return (
-    <span className="brand" aria-label="Rotto">
+    <span className={styles["brand"]} aria-label="Rotto">
       <svg viewBox="0 0 32 32" fill="none" aria-hidden="true">
         <circle cx="16" cy="16" r="13" stroke="currentColor" strokeWidth="3" />
         <path
@@ -10,7 +11,7 @@ export function Brand() {
           strokeLinecap="round"
         />
       </svg>
-      rotto<span className="brand-dot">.</span>
+      rotto<span className={styles["brand-dot"]}>.</span>
     </span>
   );
 }

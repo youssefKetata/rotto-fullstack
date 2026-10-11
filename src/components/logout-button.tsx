@@ -1,8 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import styles from "./controls.module.css";
 
-export function LogoutButton() {
+import { useState } from "react";
+import { DropdownMenuItem } from "./ui/dropdown-menu";
+
+export function LogoutButton({ menuItem = false }: { menuItem?: boolean }) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
   async function signOut() {
@@ -18,13 +21,38 @@ export function LogoutButton() {
       setPending(false);
     }
   }
+  if (menuItem) {
+    return (
+      <>
+        <DropdownMenuItem
+          className={styles["secondary-button"]}
+          disabled={pending}
+          onSelect={(event) => {
+            event.preventDefault();
+            void signOut();
+          }}
+        >
+          {pending ? "Signing out…" : "Sign out"}
+        </DropdownMenuItem>
+        {error && (
+          <p className={styles["form-error"]} role="alert">
+            {error}
+          </p>
+        )}
+      </>
+    );
+  }
   return (
-    <div className="logout-control">
-      <button className="secondary-button" onClick={signOut} disabled={pending}>
+    <div className={styles["logout-control"]}>
+      <button
+        className={styles["secondary-button"]}
+        onClick={signOut}
+        disabled={pending}
+      >
         {pending ? "Signing out…" : "Sign out"}
       </button>
       {error && (
-        <p className="form-error" role="alert">
+        <p className={styles["form-error"]} role="alert">
           {error}
         </p>
       )}

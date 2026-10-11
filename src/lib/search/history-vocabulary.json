@@ -1,0 +1,155 @@
+{
+  "countries": ["US"],
+  "locations": [
+    {
+      "city": "Atlanta",
+      "state": "GA",
+      "country": "US"
+    },
+    {
+      "city": "Austin",
+      "state": "TX",
+      "country": "US"
+    },
+    {
+      "city": "Boston",
+      "state": "MA",
+      "country": "US"
+    },
+    {
+      "city": "Chicago",
+      "state": "IL",
+      "country": "US"
+    },
+    {
+      "city": "Denver",
+      "state": "CO",
+      "country": "US"
+    },
+    {
+      "city": "Los Angeles",
+      "state": "CA",
+      "country": "US"
+    },
+    {
+      "city": "Miami",
+      "state": "FL",
+      "country": "US"
+    },
+    {
+      "city": "New York",
+      "state": "NY",
+      "country": "US"
+    },
+    {
+      "city": "San Francisco",
+      "state": "CA",
+      "country": "US"
+    },
+    {
+      "city": "Seattle",
+      "state": "WA",
+      "country": "US"
+    }
+  ],
+  "degrees": ["BA", "BS", "MBA", "MS", "PhD"],
+  "schools": [
+    "Carnegie Mellon University",
+    "Columbia University",
+    "Cornell University",
+    "Georgia Tech",
+    "MIT",
+    "New York University",
+    "Northeastern University",
+    "Stanford University",
+    "UC Berkeley",
+    "University of Illinois",
+    "University of Michigan",
+    "University of Texas at Austin",
+    "University of Washington"
+  ],
+  "companies": [
+    "Arcadia Robotics",
+    "Atlas Retail",
+    "Beacon Energy",
+    "Brightpath",
+    "Copperline",
+    "Crescent Media",
+    "Driftwood Data",
+    "Evergreen Bank",
+    "Fernway",
+    "Globalcorp",
+    "Harborview Health",
+    "Hexlane",
+    "Ironclad Systems",
+    "Keystone Logistics",
+    "Kitebird",
+    "Lumen Labs",
+    "Meridian Financial",
+    "Mintleaf",
+    "Northwind AI",
+    "Orbitly",
+    "Paperplane",
+    "Pebblepay",
+    "Pinnacle Insurance",
+    "Quillstack",
+    "Saltbox",
+    "Summit Telecom",
+    "Tidal Health",
+    "Titan Software"
+  ],
+  "titles": [
+    "Account Executive",
+    "Backend Engineer",
+    "Data Engineer",
+    "Data Scientist",
+    "DevOps Engineer",
+    "Frontend Engineer",
+    "Full Stack Engineer",
+    "Junior Account Executive",
+    "Junior Backend Engineer",
+    "Junior Data Engineer",
+    "Junior Data Scientist",
+    "Junior DevOps Engineer",
+    "Junior Frontend Engineer",
+    "Junior Full Stack Engineer",
+    "Junior Machine Learning Engineer",
+    "Junior Marketing Manager",
+    "Junior Mobile Engineer",
+    "Junior Product Designer",
+    "Junior Product Manager",
+    "Junior Recruiter",
+    "Machine Learning Engineer",
+    "Marketing Manager",
+    "Mobile Engineer",
+    "Product Designer",
+    "Product Manager",
+    "Recruiter",
+    "Senior Account Executive",
+    "Senior Backend Engineer",
+    "Senior Data Engineer",
+    "Senior Data Scientist",
+    "Senior DevOps Engineer",
+    "Senior Frontend Engineer",
+    "Senior Full Stack Engineer",
+    "Senior Machine Learning Engineer",
+    "Senior Marketing Manager",
+    "Senior Mobile Engineer",
+    "Senior Product Designer",
+    "Senior Product Manager",
+    "Senior Recruiter",
+    "Staff Account Executive",
+    "Staff Backend Engineer",
+    "Staff Data Engineer",
+    "Staff Data Scientist",
+    "Staff DevOps Engineer",
+    "Staff Frontend Engineer",
+    "Staff Full Stack Engineer",
+    "Staff Machine Learning Engineer",
+    "Staff Marketing Manager",
+    "Staff Mobile Engineer",
+    "Staff Product Designer",
+    "Staff Product Manager",
+    "Staff Recruiter"
+  ]
+}
