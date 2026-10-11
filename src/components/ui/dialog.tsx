@@ -9,6 +9,7 @@ const Dialog = DialogPrimitive.Root;
 const DialogClose = DialogPrimitive.Close;
 const DialogTitle = DialogPrimitive.Title;
 const DialogDescription = DialogPrimitive.Description;
+const DialogPortalContext = React.createContext<HTMLElement | null>(null);
 
 function DialogContent({
   children,
@@ -20,6 +21,8 @@ function DialogContent({
   onBackdropClick: () => void;
 }) {
   const previousFocus = React.useRef<HTMLElement | null>(null);
+  const [portalContainer, setPortalContainer] =
+    React.useState<HTMLDivElement | null>(null);
   return (
     <DialogPrimitive.Portal>
       <DialogPrimitive.Overlay
@@ -49,10 +52,21 @@ function DialogContent({
           target?.focus({ preventScroll: true });
         }}
       >
-        {children}
+        <DialogPortalContext.Provider value={portalContainer}>
+          {children}
+        </DialogPortalContext.Provider>
+        {/* Keep Base UI popups inside Radix's focus and scroll-lock boundary. */}
+        <div ref={setPortalContainer} />
       </DialogPrimitive.Content>
     </DialogPrimitive.Portal>
   );
 }
 
-export { Dialog, DialogClose, DialogContent, DialogTitle, DialogDescription };
+export {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogTitle,
+  DialogDescription,
+  DialogPortalContext,
+};

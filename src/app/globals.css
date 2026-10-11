@@ -12,6 +12,8 @@
   --hover: #233b320b;
   --ring: #233b32;
   --danger: #a8402c;
+  --notice: #76521b;
+  --notice-soft: #faf2df;
 }
 @theme inline {
   --color-background: var(--background);
@@ -42,7 +44,7 @@ button {
 button:disabled {
   cursor: default;
 }
-:is(button, a, input, textarea, select):focus-visible {
+:focus-visible {
   outline: 2px solid var(--ring);
   outline-offset: 2px;
 }

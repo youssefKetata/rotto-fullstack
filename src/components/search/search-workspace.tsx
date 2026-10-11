@@ -1,7 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import Link from "next/link";
+import { useState } from "react";
 import { Brand } from "@/components/brand";
 import { LogoutButton } from "@/components/logout-button";
 import {
@@ -10,346 +9,170 @@ import {
   DropdownMenuContent,
   DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
-import {
-  Select,
-  SelectTrigger,
-  SelectValue,
-  SelectContent,
-  SelectItem,
-} from "@/components/ui/select";
-import {
-  filterChips,
-  previewBrief,
-  validateFilters,
-} from "@/lib/search/filters";
-import type {
-  Candidate,
-  Filters,
-  SearchResult,
-  Sort,
-} from "@/lib/search/types";
 import { BriefForm } from "./brief-form";
 import { CandidateRow } from "./candidate-row";
-import { CandidateDrawer } from "./candidate-drawer";
-import { FilterEditor } from "./filter-editor";
+import {
+  FilterSummary,
+  removeRequirement,
+  requirementLabel,
+  requirementExplanation,
+} from "./filter-summary";
+import type { SearchFilters } from "@/lib/search/schema";
+import { WorkspaceOverlays } from "./workspace-overlays";
+import { useSearchWorkspace } from "./hooks/use-search-workspace";
+import type { WorkspaceIdentity } from "./workspace-state";
 import { Icon } from "./icon";
 import styles from "./search-workspace.module.css";
-
-type Snapshot = {
-  brief: string;
-  submitted: string;
-  filters: Filters;
-  original: Filters;
-  unsupported: string[];
-  results: Candidate[];
-  total: number;
-  page: number;
-  sort: Sort;
-  shortlist: Candidate[];
-  error: string;
-};
 
 export function SearchWorkspace({
   company,
   companyId,
   recruiterId,
-}: {
-  company?: string;
-  companyId?: string;
-  recruiterId?: string;
-}) {
-  const [brief, setBrief] = useState("");
-  const [submitted, setSubmitted] = useState("");
-  const [filters, setFilters] = useState<Filters>({ skills: [] });
-  const [original, setOriginal] = useState<Filters>({ skills: [] });
-  const [unsupported, setUnsupported] = useState<string[]>([]);
-  const [results, setResults] = useState<Candidate[]>([]);
-  const [total, setTotal] = useState(0);
-  const [page, setPage] = useState(1);
-  const [sort, setSort] = useState<Sort>("availability");
-  const [pending, setPending] = useState(false);
-  const [paging, setPaging] = useState(false);
-  const [error, setError] = useState("");
-  const [retryPage, setRetryPage] = useState(1);
-  const [storageError, setStorageError] = useState("");
-  const [shortlist, setShortlist] = useState<Candidate[]>([]);
-  const [shortlistView, setShortlistView] = useState(false);
-  const [candidate, setCandidate] = useState<Candidate | null>(null);
-  const [editFilters, setEditFilters] = useState(false);
-  const [notice, setNotice] = useState("");
-  const [restored, setRestored] = useState(false);
-  const request = useRef<AbortController | null>(null);
-  const count = useRef<HTMLHeadingElement>(null);
-  const searchScroll = useRef(0);
-  const key =
-    companyId && recruiterId
-      ? `rotto-preview-v1:${companyId}:${recruiterId}`
-      : null;
-  const adjusted = JSON.stringify(filters) !== JSON.stringify(original);
-  const visible = shortlistView ? shortlist : results;
-
-  useEffect(() => {
-    if (!key) return;
-    let active = true;
-    const controller = new AbortController();
-    // Read browser-only persistence after hydration; never submit a search.
-    async function restore() {
-      await Promise.resolve();
-      try {
-        const saved = sessionStorage.getItem(key!);
-        if (saved && active) {
-          const snapshot = JSON.parse(saved) as Snapshot;
-          const savedFilters = validateFilters(snapshot.filters);
-          const savedOriginal = validateFilters(snapshot.original);
-          if (
-            savedFilters &&
-            savedOriginal &&
-            Array.isArray(snapshot.results) &&
-            Array.isArray(snapshot.shortlist)
-          ) {
-            setBrief(snapshot.brief);
-            setSubmitted(snapshot.submitted);
-            setFilters(savedFilters);
-            setOriginal(savedOriginal);
-            setUnsupported(snapshot.unsupported);
-            setResults(snapshot.results);
-            setTotal(snapshot.total);
-            setPage(snapshot.page);
-            setSort(snapshot.sort);
-            setShortlist(snapshot.shortlist);
-            setError(snapshot.error ?? "");
-          }
-        }
-      } catch {
-        if (active)
-          setStorageError(
-            "This browser couldn't restore your preview. You can still search.",
-          );
-      }
-      if (active) setRestored(true);
-    }
-    async function openLink() {
-      const id = new URL(window.location.href).searchParams.get("candidate");
-      if (!id) {
-        if (active) setCandidate(null);
-        return;
-      }
-      try {
-        const response = await fetch(
-          `/api/preview/candidates/${encodeURIComponent(id)}`,
-          { signal: controller.signal },
-        );
-        const data = await response.json();
-        if (!response.ok) throw new Error(data.error);
-        if (active) setCandidate(data);
-      } catch (cause) {
-        if (active && !controller.signal.aborted)
-          setError(
-            cause instanceof Error ? cause.message : "Couldn't open candidate.",
-          );
-      }
-    }
-    void restore();
-    void openLink();
-    window.addEventListener("popstate", openLink);
-    return () => {
-      active = false;
-      controller.abort();
-      request.current?.abort();
-      window.removeEventListener("popstate", openLink);
-    };
-  }, [key]);
-
-  useEffect(() => {
-    if (!key || !restored || pending) return;
-    try {
-      const snapshot: Snapshot = {
-        brief,
-        submitted,
-        filters,
-        original,
-        unsupported,
-        results,
-        total,
-        page,
-        sort,
-        shortlist,
-        error,
-      };
-      sessionStorage.setItem(key, JSON.stringify(snapshot));
-    } catch {
-      // Storage can be disabled or full; local UI remains usable.
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setStorageError(
-        "Browser storage is unavailable. This preview won't survive a reload.",
-      );
-    }
-  }, [
-    key,
-    restored,
+}: WorkspaceIdentity & { company?: string }) {
+  const workspace = useSearchWorkspace({ companyId, recruiterId });
+  const {
     brief,
-    submitted,
+    setBrief,
+    search,
     filters,
-    original,
-    unsupported,
-    results,
-    total,
-    page,
-    sort,
-    shortlist,
-    error,
+    setFilters,
+    plan,
+    view,
+    setView,
+    lists,
+    listPeople,
+    activeList,
+    savedBriefs,
+    candidate,
+    setNameAction,
+    setDeleteList,
+    setEditFilters,
+    setUpgrade,
     pending,
-  ]);
-
-  async function load(
-    nextFilters: Filters,
-    nextSort: Sort = sort,
-    nextPage = 1,
-  ) {
-    request.current?.abort();
-    const controller = new AbortController();
-    request.current = controller;
-    setError("");
-    setRetryPage(nextPage);
-    setPending(true);
-    setPaging(nextPage > 1);
-    if (nextPage === 1) {
-      setResults([]);
-      setTotal(0);
-      setPage(1);
-    }
-    if (!filterChips(nextFilters).length) {
-      setError("Add at least one filter to find candidates.");
-      setPending(false);
-      return;
-    }
-    try {
-      const response = await fetch("/api/preview/candidates", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          filters: nextFilters,
-          sort: nextSort,
-          page: nextPage,
-        }),
-        signal: controller.signal,
-      });
-      const data = await response.json();
-      if (!response.ok)
-        throw new Error(data.error ?? "Couldn't load candidates.");
-      const result = data as SearchResult;
-      setResults((previous) =>
-        nextPage > 1 ? [...previous, ...result.results] : result.results,
+    paging,
+    collectionPending,
+    saving,
+    searchSaved,
+    planPending,
+    ready,
+    error,
+    setError,
+    setDialogError,
+    notice,
+    retry,
+    pageError,
+    count,
+    adjusted,
+    exhausted,
+    visible,
+    matched,
+    currentList,
+    savedIds,
+    planNote,
+    refreshPlan,
+    selectList,
+    execute,
+    startOperation,
+    more,
+    openPerson,
+    openPicker,
+    membership,
+    saveSearch,
+    startOver,
+    showLists,
+  } = workspace;
+  const [omitted, setOmitted] = useState<{
+    brief: string;
+    issues: SearchFilters["issues"];
+  }>({ brief: "", issues: [] });
+  function updateRequirements(next: SearchFilters) {
+    if (search && filters) {
+      const removed = filters.issues.filter(
+        (issue) =>
+          issue.kind === "unsupported" &&
+          !next.issues.some(
+            (item) =>
+              item.text === issue.text && (!issue.required || item.required),
+          ),
       );
-      setTotal(result.total);
-      setPage(nextPage);
-      setNotice(
-        nextPage > 1
-          ? `${Math.min(nextPage * 20, result.total)} of ${result.total} candidates shown.`
-          : `${result.total} ${result.total === 1 ? "candidate" : "candidates"} found.`,
-      );
-      if (nextPage === 1)
-        requestAnimationFrame(() =>
-          count.current?.focus({ preventScroll: true }),
-        );
-    } catch (cause) {
-      if (!controller.signal.aborted)
-        setError(
-          cause instanceof Error
-            ? cause.message
-            : "Couldn't connect. Please try again.",
-        );
-    } finally {
-      if (!controller.signal.aborted) {
-        setPending(false);
-        setPaging(false);
-      }
+      setOmitted((previous) => ({
+        brief: search.brief,
+        issues: [
+          ...(previous.brief === search.brief ? previous.issues : []),
+          ...removed,
+        ].filter(
+          (issue, index, all) =>
+            all.findIndex((item) => item.text === issue.text) === index,
+        ),
+      }));
     }
-  }
-
-  function submit() {
-    const text = brief.trim();
-    if (pending || !text || text === submitted) return;
-    const interpreted = previewBrief(text);
-    setSubmitted(text);
-    setFilters(interpreted.filters);
-    setOriginal(interpreted.filters);
-    setUnsupported(interpreted.unsupported);
-    setShortlistView(false);
-    void load(interpreted.filters);
-  }
-  function refine(next: Filters) {
     setFilters(next);
-    setEditFilters(false);
-    void load(next);
   }
-  function remove(key: keyof Filters, skill?: string) {
-    const next = { ...filters };
-    if (skill) next.skills = next.skills.filter((s) => s !== skill);
-    else delete next[key];
-    refine(next);
-  }
-  function toggle(person: Candidate) {
-    const saved = shortlist.some((c) => c.id === person.id);
-    setShortlist((previous) =>
-      saved
-        ? previous.filter((c) => c.id !== person.id)
-        : [...previous, person],
-    );
-    setNotice(
-      `${person.full_name} ${saved ? "removed from" : "added to"} your tab-local shortlist.`,
+  function continueWithoutRequirement(index: number) {
+    if (!filters || pending) return;
+    updateRequirements(removeRequirement(filters, index));
+    workspace.setNotice(
+      `${requirementLabel(filters.issues[index])} removed from requirements. Apply changes to run a new search.`,
     );
   }
-  function showShortlist(show: boolean) {
-    if (show) searchScroll.current = window.scrollY;
-    setShortlistView(show);
-    requestAnimationFrame(() =>
-      window.scrollTo({ top: show ? 0 : searchScroll.current }),
-    );
-  }
-  function linkCandidate(person: Candidate | null) {
-    setCandidate(person);
-    const url = new URL(window.location.href);
-    if (person) url.searchParams.set("candidate", person.id);
-    else url.searchParams.delete("candidate");
-    window.history.replaceState(window.history.state, "", url);
-  }
-  function startOver() {
-    request.current?.abort();
-    setPending(false);
-    setPaging(false);
-    setBrief("");
-    setSubmitted("");
-    setFilters({ skills: [] });
-    setOriginal({ skills: [] });
-    setResults([]);
-    setTotal(0);
-    setUnsupported([]);
-    setError("");
-    setShortlistView(false);
-    requestAnimationFrame(() =>
-      document.getElementById("candidate-brief")?.focus(),
-    );
-  }
-
+  const unchecked =
+    omitted.brief === search?.brief
+      ? omitted.issues.filter(
+          (issue) =>
+            !filters?.issues.some(
+              (item) => item.text === issue.text && item.required,
+            ),
+        )
+      : [];
+  const blocking =
+    search?.filters.issues.filter((issue) => issue.required) ?? [];
+  const recoveryIndex =
+    filters?.issues.findIndex((issue) => issue.required) ?? -1;
+  const recovery =
+    recoveryIndex >= 0 ? filters?.issues[recoveryIndex] : undefined;
+  const resultStatus =
+    view === "search" && search
+      ? `${search.total} ${search.total === 1 ? "candidate" : "candidates"}.${blocking.length ? ` ${blocking.map((issue) => `${requirementLabel(issue)} ${issue.kind === "unsupported" ? "can't be checked" : "needs review"}`).join(". ")}.` : ""}${unchecked.length ? ` Not checked: ${unchecked.map(requirementLabel).join(", ")}.${adjusted ? " Changes staged; results still use the previous requirements." : ""}` : ""}`
+      : "";
   return (
     <main className={styles.workspace}>
       <header className={styles.header}>
-        <Link href="/" className={styles.brandLink} aria-label="Rotto home">
+        <button
+          type="button"
+          className={styles.brandLink}
+          aria-label="Rotto search home"
+          onClick={() => setView("search")}
+        >
           <Brand />
-        </Link>
+        </button>
         <div className={styles.headerActions}>
           <button
             type="button"
             className={styles.shortlist}
-            data-active={shortlistView}
-            aria-pressed={shortlistView}
-            onClick={() => showShortlist(!shortlistView)}
-            disabled={!company}
+            data-active={view === "saved"}
+            aria-pressed={view === "saved"}
+            aria-label={`Saved searches, ${savedBriefs.length}`}
+            onClick={() => setView(view === "saved" ? "search" : "saved")}
+            disabled={!ready}
           >
-            <Icon name="bookmark" size={18} />
-            <span>Shortlist</span>
-            <span className={styles.badge}>{shortlist.length}</span>
+            <Icon name="history" size={18} />
+            <span className={styles.headerLabel}>Saved searches</span>
+            <span className={styles.badge}>{savedBriefs.length}</span>
+          </button>
+          <button
+            type="button"
+            className={styles.shortlist}
+            data-active={view === "shortlists"}
+            aria-pressed={view === "shortlists"}
+            aria-label={`Lists, ${lists.length}`}
+            onClick={() =>
+              view === "shortlists" ? setView("search") : void showLists()
+            }
+            disabled={!ready}
+          >
+            <Icon name="list" size={18} />
+            <span className={styles.headerLabel}>Lists</span>
+            <span className={styles.badge}>{lists.length}</span>
           </button>
           {company ? (
             <DropdownMenu>
@@ -380,168 +203,314 @@ export function SearchWorkspace({
         </div>
       </header>
       <div className={styles.body}>
-        {!shortlistView && (
+        {view === "search" && (
           <BriefForm
             brief={brief}
-            onChange={company && restored ? setBrief : undefined}
-            onSubmit={company && restored ? submit : undefined}
+            onChange={company && ready ? setBrief : undefined}
+            onSubmit={
+              company && ready
+                ? () => startOperation("/api/search", { brief: brief.trim() })
+                : undefined
+            }
             pending={pending}
-            compact={!!submitted}
-            submitted={submitted}
-            onReset={startOver}
+            compact={!!search}
+            submitted={search?.brief}
+            onReset={() => {
+              setOmitted({ brief: "", issues: [] });
+              startOver();
+            }}
+            planNote={
+              exhausted
+                ? "Review your requirements before your next search."
+                : planNote
+            }
+            exhausted={exhausted}
+            onUpgrade={() => setUpgrade(true)}
           />
         )}
-        {shortlistView ? (
+        {view === "search" && search && filters && (
+          <section
+            className={styles.interpretation}
+            aria-label="Search requirements"
+          >
+            <div className={styles.filterHeading}>
+              <span>Requirements</span>
+              <div className={styles.inlineActions}>
+                <button
+                  type="button"
+                  className={styles.edit}
+                  disabled={pending}
+                  onClick={() => setEditFilters(true)}
+                >
+                  <Icon name="filter" size={16} />
+                  Edit requirements
+                </button>
+                <button
+                  type="button"
+                  className={styles.edit}
+                  disabled={!ready || pending || saving || searchSaved}
+                  onClick={() => void saveSearch()}
+                >
+                  <Icon name={searchSaved ? "check" : "bookmark"} size={16} />
+                  {saving ? "Saving…" : searchSaved ? "Saved" : "Save search"}
+                </button>
+              </div>
+            </div>
+            <FilterSummary
+              filters={filters}
+              disabled={pending}
+              onChange={updateRequirements}
+              onEdit={() => setEditFilters(true)}
+              onRemoveRequirement={continueWithoutRequirement}
+            />
+            <p className={styles.trust}>
+              {filters.anyOf.length > 1
+                ? "Candidates must match every requirement in any one accepted set."
+                : "Candidates must match every requirement."}
+              {filters.preferred.length > 0 &&
+                " Nice-to-have requirements change the order only."}
+            </p>
+            {adjusted && (
+              <div className={styles.adjusted}>
+                <span>
+                  Changes staged · Results still use the previous requirements.
+                </span>
+                <div className={styles.inlineActions}>
+                  <button
+                    type="button"
+                    disabled={pending}
+                    onClick={() =>
+                      updateRequirements(structuredClone(search.filters))
+                    }
+                  >
+                    Discard edits
+                  </button>
+                  <button
+                    type="button"
+                    className={exhausted ? styles.edit : styles.primaryButton}
+                    disabled={pending}
+                    onClick={() =>
+                      startOperation(
+                        `/api/search/${encodeURIComponent(search.search_id)}/rerun`,
+                        { filters },
+                      )
+                    }
+                  >
+                    {exhausted
+                      ? "Upgrade to apply"
+                      : pending
+                        ? "Applying…"
+                        : "Apply changes"}
+                  </button>
+                </div>
+              </div>
+            )}
+          </section>
+        )}
+        {view !== "search" && (
           <div className={styles.shortlistHeading}>
             <button
               className={styles.back}
               type="button"
-              onClick={() => showShortlist(false)}
+              onClick={() => setView("search")}
             >
               ← Back to search
             </button>
-            <h1>Your shortlist.</h1>
-            <p>
-              A few people worth a closer look. Saved in this tab for {company}.
-            </p>
-          </div>
-        ) : (
-          submitted && (
-            <section
-              className={styles.interpretation}
-              aria-label="Search filters"
-            >
-              <div className={styles.filterHeading}>
-                <span>
-                  Understood as{" "}
-                  <span className={styles.preview}>· keyword preview</span>
-                </span>
-                <button
-                  className={styles.edit}
-                  type="button"
-                  onClick={() => setEditFilters(true)}
-                  disabled={pending}
-                >
-                  <Icon name="filter" size={16} />
-                  Edit filters
-                </button>
-              </div>
-              <div className={styles.chips}>
-                {filterChips(filters).map((chip) => (
-                  <div
-                    className={styles.chip}
-                    key={`${chip.key}:${chip.label}`}
-                  >
-                    <button
-                      type="button"
-                      disabled={pending}
-                      onClick={() => setEditFilters(true)}
-                      aria-label={`Edit filter: ${chip.label}`}
-                    >
-                      {chip.label}
-                    </button>
-                    <button
-                      type="button"
-                      disabled={pending}
-                      onClick={() => remove(chip.key, chip.skill)}
-                      aria-label={`Remove filter: ${chip.label}`}
-                    >
-                      <Icon name="close" size={13} />
-                    </button>
-                  </div>
-                ))}
-              </div>
-              <p className={styles.trust}>
-                Only these filters are applied. All selected skills are
-                required. Other wording is not interpreted in this preview.
-              </p>
-              {unsupported.length > 0 && (
-                <p className={styles.unsupported}>
-                  Not interpreted: {unsupported.join(", ")}. Review the filters
-                  above.
+            <div className={styles.collectionHeading}>
+              <div>
+                <h1>
+                  {view === "saved"
+                    ? "Saved searches."
+                    : "Your team’s shortlists."}
+                </h1>
+                <p>
+                  {view === "saved"
+                    ? "Keep a brief and its exact requirements. Rerunning counts as a new search."
+                    : `People worth a closer look, saved for ${company}.`}
                 </p>
-              )}
-              {adjusted && (
-                <div className={styles.adjusted}>
-                  Filters adjusted
-                  <button
-                    type="button"
-                    onClick={() => refine(original)}
-                    disabled={pending}
-                  >
-                    Reset to original
-                  </button>
-                </div>
-              )}
-            </section>
-          )
-        )}
-        {(submitted || shortlistView) && (
-          <section
-            className={styles.results}
-            aria-label={shortlistView ? "Shortlist" : "Search results"}
-            aria-busy={pending && !shortlistView}
-          >
-            <div className={styles.resultHeading}>
-              <h2 tabIndex={-1} ref={count}>
-                {shortlistView
-                  ? `${shortlist.length} shortlisted`
-                  : pending && !paging
-                    ? "Finding candidates…"
-                    : error && !results.length
-                      ? "Search needs attention"
-                      : `${total.toLocaleString()} ${total === 1 ? "candidate" : "candidates"}`}
-              </h2>
-              {!shortlistView && (
-                <div className={styles.sort}>
-                  <label htmlFor="candidate-sort">Sort by</label>
-                  <Select
-                    value={sort}
-                    disabled={pending}
-                    onValueChange={(value: Sort) => {
-                      setSort(value);
-                      void load(filters, value);
-                    }}
-                  >
-                    <SelectTrigger
-                      id="candidate-sort"
-                      className={styles.sortTrigger}
-                    >
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="availability">
-                        Open to work, then experience
-                      </SelectItem>
-                      <SelectItem value="experience">Experience</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+              </div>
+              {view === "shortlists" && (
+                <button
+                  className={styles.primaryButton}
+                  type="button"
+                  onClick={() => {
+                    setDialogError("");
+                    setNameAction({ kind: "create" });
+                  }}
+                >
+                  Create list
+                </button>
               )}
             </div>
-            {error && !shortlistView && (
-              <div className={styles.error} role="alert">
-                <p>{error}</p>
-                <button
-                  type="button"
-                  disabled={pending}
-                  onClick={() => void load(filters, sort, retryPage)}
-                >
-                  Try again
-                </button>
-                <button
-                  type="button"
-                  disabled={pending}
-                  onClick={() => setEditFilters(true)}
-                >
-                  Edit filters
+          </div>
+        )}
+        {error && (
+          <div className={styles.error} role="alert">
+            <p>{error}</p>
+            {retry && (
+              <button
+                type="button"
+                disabled={pending}
+                onClick={() => void execute(retry)}
+              >
+                Retry request
+              </button>
+            )}
+            {!plan && (
+              <button
+                type="button"
+                disabled={planPending}
+                onClick={() => void refreshPlan()}
+              >
+                Check plan
+              </button>
+            )}
+            <button type="button" onClick={() => setError("")}>
+              Dismiss
+            </button>
+          </div>
+        )}
+        {view === "saved" && (
+          <section aria-label="Saved searches">
+            {savedBriefs.length > 0 && (
+              <ul className={styles.savedList}>
+                {savedBriefs.map((saved) => (
+                  <li key={saved.id}>
+                    <div>
+                      <h2>{saved.brief}</h2>
+                      <p>
+                        {saved.filters.anyOf.length}{" "}
+                        {saved.filters.anyOf.length === 1
+                          ? "accepted set"
+                          : "accepted sets"}
+                        {saved.filters.issues.length
+                          ? ` · ${saved.filters.issues.length} requirements to review`
+                          : ""}
+                      </p>
+                    </div>
+                    <button
+                      className={styles.primaryButton}
+                      type="button"
+                      disabled={pending}
+                      onClick={() =>
+                        startOperation(
+                          `/api/saved-briefs/${encodeURIComponent(saved.id)}/rerun`,
+                          {},
+                        )
+                      }
+                    >
+                      {exhausted ? "Upgrade to rerun" : "Rerun search"}
+                      <Icon name="arrow" size={16} />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {!savedBriefs.length && (
+              <div className={styles.empty}>
+                <h3>A good search is worth keeping.</h3>
+                <p>
+                  Choose Save search above the results to return to its brief
+                  and requirements later.
+                </p>
+                <button type="button" onClick={() => setView("search")}>
+                  Back to search
                 </button>
               </div>
             )}
-            {pending && !paging && !shortlistView ? (
+          </section>
+        )}
+        {view === "shortlists" && (
+          <div className={styles.listToolbar}>
+            <div
+              className={styles.listTabs}
+              role="group"
+              aria-label="Choose shortlist"
+            >
+              {lists.map((list) => (
+                <button
+                  key={list.id}
+                  type="button"
+                  data-active={activeList === list.id}
+                  disabled={collectionPending}
+                  onClick={() => void selectList(list.id)}
+                >
+                  {list.name}
+                  {listPeople[list.id] && (
+                    <span>{listPeople[list.id].length}</span>
+                  )}
+                </button>
+              ))}
+            </div>
+            {currentList && (
+              <div className={styles.inlineActions}>
+                <button
+                  className={styles.edit}
+                  type="button"
+                  onClick={() => {
+                    setDialogError("");
+                    setNameAction({ kind: "rename", list: currentList });
+                  }}
+                >
+                  Rename
+                </button>
+                <button
+                  className={styles.edit}
+                  type="button"
+                  onClick={() => {
+                    setDialogError("");
+                    setDeleteList(currentList);
+                  }}
+                >
+                  Delete
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+        {((view === "search" && (search || pending)) ||
+          view === "shortlists") && (
+          <section
+            className={styles.results}
+            aria-label={
+              view === "shortlists" ? "Shortlist candidates" : "Search results"
+            }
+            aria-busy={pending || collectionPending}
+          >
+            <div className={styles.resultHeading}>
+              <div className={styles.resultCount}>
+                <h2
+                  tabIndex={-1}
+                  ref={count}
+                  aria-label={resultStatus || undefined}
+                >
+                  {pending
+                    ? "Finding candidates…"
+                    : view === "shortlists"
+                      ? `${visible.length} shortlisted`
+                      : `${search?.total.toLocaleString() ?? 0} ${search?.total === 1 ? "candidate" : "candidates"}`}
+                </h2>
+                {view === "search" && unchecked.length > 0 && (
+                  <p className={styles.notChecked}>
+                    Not checked: {unchecked.map(requirementLabel).join(", ")}
+                    {adjusted && " · Changes staged"}
+                  </p>
+                )}
+              </div>
+              {view === "search" && search && search.total > 0 && !pending && (
+                <span className={styles.rankNote}>
+                  {adjusted ? "Previous requirements · " : ""}
+                  {search.filters.preferred.length
+                    ? "Most nice-to-have requirements matched first, then years of experience"
+                    : "Most years of experience first"}
+                </span>
+              )}
+            </div>
+            {(pending && !search) ||
+            (collectionPending && view === "shortlists") ? (
               <div className={styles.skeletons} aria-hidden="true">
-                {Array.from({ length: 5 }, (_, i) => (
-                  <div className={styles.skeleton} key={i}>
+                {Array.from({ length: 4 }, (_, index) => (
+                  <div className={styles.skeleton} key={index}>
                     <span />
                     <div>
                       <i />
@@ -553,114 +522,152 @@ export function SearchWorkspace({
               </div>
             ) : (
               <>
-                <ul className={styles.list}>
-                  {visible.map((person) => (
-                    <CandidateRow
-                      key={person.id}
-                      candidate={person}
-                      matched={filters.skills}
-                      selected={candidate?.id === person.id}
-                      saved={shortlist.some((c) => c.id === person.id)}
-                      onOpen={linkCandidate}
-                      onToggle={toggle}
-                    />
-                  ))}
-                </ul>
-                {!visible.length && !error && (
+                {visible.length > 0 && (
+                  <ul className={styles.list}>
+                    {visible.map((person) => (
+                      <CandidateRow
+                        key={person.id}
+                        candidate={person}
+                        matched={view === "shortlists" ? [] : matched}
+                        selected={candidate?.id === person.id}
+                        saved={savedIds.has(person.id)}
+                        onOpen={(person) => void openPerson(person)}
+                        onToggle={(person) =>
+                          view === "shortlists" && currentList
+                            ? void membership(currentList, person, true)
+                            : void openPicker(person)
+                        }
+                      />
+                    ))}
+                  </ul>
+                )}
+                {!visible.length && !pending && (
                   <div className={styles.empty}>
                     <span className={styles.emptyIcon}>
                       <Icon
-                        name={shortlistView ? "bookmark" : "search"}
+                        name={view === "shortlists" ? "bookmark" : "search"}
                         size={26}
                       />
                     </span>
                     <h3>
-                      {shortlistView
-                        ? "Keep the people who stand out."
-                        : "No one matches every detail."}
+                      {view === "shortlists"
+                        ? lists.length
+                          ? "Keep the people who stand out."
+                          : "Start with a named list."
+                        : "No candidates match every requirement"}
                     </h3>
                     <p>
-                      {shortlistView
-                        ? "Shortlist a candidate from the results or their profile. They'll appear here."
-                        : "Try removing a skill or broadening the location. Your brief stays right here."}
+                      {view === "shortlists"
+                        ? "Shortlist a candidate from the results or their profile. Your team can return to them here."
+                        : blocking.length
+                          ? blocking
+                              .map(
+                                (issue) =>
+                                  `${requirementLabel(issue)} ${issue.kind === "unsupported" ? "can't be checked" : "needs review"}. ${requirementExplanation(issue)}`,
+                              )
+                              .join(" ")
+                          : "Try changing a requirement to broaden your next search."}
                     </p>
-                    {shortlistView ? (
+                    {view === "search" && (
+                      <>
+                        {recovery && (
+                          <button
+                            type="button"
+                            className={styles.primaryButton}
+                            disabled={pending}
+                            onClick={() =>
+                              continueWithoutRequirement(recoveryIndex)
+                            }
+                          >
+                            Continue without {requirementLabel(recovery)}
+                            <Icon name="arrow" size={16} />
+                          </button>
+                        )}
+                        {adjusted && !recovery && (
+                          <p>
+                            Requirement changes are staged. Apply changes above
+                            to run a new search.
+                          </p>
+                        )}
+                        <button
+                          type="button"
+                          className={styles.emptyEdit}
+                          disabled={pending}
+                          onClick={() => setEditFilters(true)}
+                        >
+                          Edit requirements
+                        </button>
+                      </>
+                    )}
+                    {view === "shortlists" && (
                       <button
                         type="button"
-                        onClick={() => showShortlist(false)}
+                        onClick={() =>
+                          lists.length
+                            ? setView("search")
+                            : setNameAction({ kind: "create" })
+                        }
                       >
-                        Back to search
-                        <Icon name="arrow" size={17} />
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => setEditFilters(true)}
-                      >
-                        Adjust filters
-                        <Icon name="filter" size={17} />
+                        {lists.length ? "Back to search" : "Create a list"}
                       </button>
                     )}
                   </div>
                 )}
-              </>
-            )}
-            {!shortlistView && results.length > 0 && (
-              <div className={styles.pagination}>
-                <span>
-                  Showing {results.length} of {total.toLocaleString()}
-                </span>
-                {results.length < total && (
-                  <button
-                    type="button"
-                    disabled={pending}
-                    onClick={() => void load(filters, sort, page + 1)}
-                  >
-                    {paging ? "Loading candidates…" : "Show 20 more"}
-                    <Icon name="chevron" size={16} />
-                  </button>
+                {view === "search" && search && !!search.results.length && (
+                  <div className={styles.pagination}>
+                    <span>
+                      {search.results.length} of {search.total.toLocaleString()}{" "}
+                      shown
+                    </span>
+                    {search.results.length < search.total && (
+                      <button
+                        type="button"
+                        disabled={paging || pending}
+                        onClick={() => void more()}
+                      >
+                        {paging
+                          ? "Loading more…"
+                          : pageError
+                            ? "Retry next page"
+                            : "Show more"}
+                        <Icon name="arrow" size={16} />
+                      </button>
+                    )}
+                  </div>
                 )}
-              </div>
+                {pageError && view === "search" && (
+                  <p className={styles.dialogError} role="alert">
+                    {pageError} Your loaded results are still here.
+                  </p>
+                )}
+              </>
             )}
           </section>
         )}
-        {storageError && (
-          <p className={styles.storageError} role="alert">
-            {storageError}
-          </p>
-        )}
-        {error && !submitted && (
-          <p className={styles.storageError} role="alert">
-            {error}
-          </p>
+        {exhausted && view === "search" && !pending && (
+          <div className={styles.planBanner}>
+            <span>
+              {company
+                ? `${company}'s free search is used.`
+                : "Your company's free search is used."}
+            </span>
+            <button type="button" onClick={() => setUpgrade(true)}>
+              Upgrade
+            </button>
+          </div>
         )}
       </div>
-      <p className={styles.srOnly} aria-live="polite" aria-atomic="true">
-        {notice}
-      </p>
-      {candidate && (
-        <CandidateDrawer
-          candidate={candidate}
-          matched={filters.skills}
-          saved={shortlist.some((c) => c.id === candidate.id)}
-          onClose={() => linkCandidate(null)}
-          onToggle={toggle}
-          position={visible.findIndex((c) => c.id === candidate.id)}
-          total={visible.length}
-          onStep={(direction) => {
-            const index = visible.findIndex((c) => c.id === candidate.id);
-            if (index >= 0 && visible[index + direction])
-              linkCandidate(visible[index + direction]);
-          }}
-        />
-      )}
-      {editFilters && (
-        <FilterEditor
-          filters={filters}
-          onClose={() => setEditFilters(false)}
-          onApply={refine}
-        />
-      )}
+      <span className={styles.srOnly} role="status" aria-live="polite">
+        {pending
+          ? "Finding candidates…"
+          : /^\d+ candidates? found\.$/.test(notice)
+            ? resultStatus
+            : `${notice} ${resultStatus}`.trim()}
+      </span>
+      <WorkspaceOverlays
+        workspace={workspace}
+        onRequirementsChange={updateRequirements}
+      />
     </main>
   );
 }

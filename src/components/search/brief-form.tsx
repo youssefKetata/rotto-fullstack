@@ -30,6 +30,9 @@ type Props = {
   compact?: boolean;
   submitted?: string;
   onReset?: () => void;
+  planNote?: string;
+  exhausted?: boolean;
+  onUpgrade?: () => void;
 };
 
 export function BriefForm({
@@ -40,6 +43,9 @@ export function BriefForm({
   compact,
   submitted,
   onReset,
+  planNote,
+  exhausted,
+  onUpgrade,
 }: Props) {
   const input = useRef<HTMLTextAreaElement>(null);
   const [editing, setEditing] = useState(false);
@@ -65,8 +71,9 @@ export function BriefForm({
   }, []);
   function submit(event: FormEvent) {
     event.preventDefault();
-    if (!pending && brief.trim() && brief.trim() !== submitted) {
-      onSubmit?.();
+    if (!pending && brief.trim()) {
+      if (exhausted) onUpgrade?.();
+      else onSubmit?.();
       setEditing(false);
     }
   }
@@ -98,7 +105,6 @@ export function BriefForm({
       </div>
       {compact && !editing ? (
         <div className={styles.briefBar}>
-          <Icon name="search" size={19} />
           <p>
             <span>Candidate brief</span>
             <span>{submitted}</span>
@@ -122,7 +128,7 @@ export function BriefForm({
             id="candidate-brief"
             value={brief}
             onChange={(e) => onChange?.(e.target.value)}
-            maxLength={1000}
+            maxLength={4000}
             rows={compact ? 2 : 4}
             readOnly={pending || !onChange}
             placeholder="Senior backend engineer, 6+ years, Go and PostgreSQL, based in Austin, open to work…"
@@ -135,42 +141,47 @@ export function BriefForm({
           />
           <div className={styles.actions}>
             <span className={styles.hint}>
-              {brief.length >= 800 ? (
-                `${brief.length}/1,000 characters`
+              {brief.length >= 3200 ? (
+                `${brief.length}/4,000 characters`
               ) : (
                 <>
                   <kbd>Ctrl / ⌘</kbd> + <kbd>Enter</kbd> to search
                 </>
               )}
             </span>
-            {(!compact || brief.trim() !== submitted) && (
-              <button
-                className={styles.submit}
-                type="submit"
-                disabled={pending || !brief.trim() || !onSubmit}
-              >
-                <span>
-                  {pending
-                    ? "Finding candidates…"
-                    : compact
-                      ? "New search"
-                      : "Find candidates"}
-                </span>
-                <Icon name="arrow" size={18} />
-              </button>
-            )}
-            {compact && (
-              <button
-                className={styles.cancel}
-                type="button"
-                onClick={() => {
-                  onChange?.(submitted ?? "");
-                  setEditing(false);
-                }}
-              >
-                Cancel
-              </button>
-            )}
+            <div className={styles.actionButtons}>
+              {compact && (
+                <button
+                  className={styles.cancel}
+                  type="button"
+                  disabled={pending}
+                  onClick={() => {
+                    onChange?.(submitted ?? "");
+                    setEditing(false);
+                  }}
+                >
+                  Cancel
+                </button>
+              )}
+              {(!compact || editing) && (
+                <button
+                  className={styles.submit}
+                  type="submit"
+                  disabled={pending || !brief.trim() || !onSubmit}
+                >
+                  <span>
+                    {pending
+                      ? "Finding candidates…"
+                      : exhausted
+                        ? "Upgrade to search"
+                        : compact
+                          ? "New search"
+                          : "Find candidates"}
+                  </span>
+                  <Icon name="arrow" size={18} />
+                </button>
+              )}
+            </div>
           </div>
         </form>
       )}
@@ -196,7 +207,9 @@ export function BriefForm({
         </div>
       )}
       <div className={styles.note}>
-        <span>UI preview · Keyword filters, no AI call or search charge.</span>
+        <span>
+          {planNote ?? "Describe your brief. Review the requirements."}
+        </span>
         {compact && (
           <button type="button" disabled={pending} onClick={onReset}>
             Start over

@@ -1,0 +1,133 @@
+.chips {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-height: 54px;
+  min-width: 0;
+  padding: 8px 44px 8px 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: 0 1px 2px #233b3205;
+  transition:
+    border-color 120ms,
+    box-shadow 120ms;
+}
+.chips:focus-within {
+  border-color: var(--control-border);
+  box-shadow: 0 0 0 2px var(--accent-soft);
+}
+.input {
+  flex: 1 1 76px;
+  width: 76px;
+  min-width: 0;
+  max-width: 100%;
+  min-height: 34px;
+  padding: 6px 4px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  font-size: 13px;
+}
+.input:focus-visible {
+  outline: none;
+}
+.input::placeholder {
+  color: var(--muted);
+  opacity: 1;
+}
+.trigger {
+  position: absolute;
+  top: 8px;
+  right: 4px;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--muted);
+}
+.trigger:hover {
+  background: var(--hover);
+  color: var(--foreground);
+}
+.trigger[data-popup-open] svg {
+  transform: rotate(180deg);
+}
+.chip {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  min-height: 34px;
+}
+.remove {
+  display: grid;
+  place-items: center;
+  min-width: 32px;
+  min-height: 32px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: inherit;
+}
+.positioner {
+  z-index: 70;
+  isolation: isolate;
+  pointer-events: auto;
+}
+.popup {
+  width: var(--anchor-width);
+  max-width: var(--available-width);
+  max-height: var(--available-height);
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--foreground);
+  box-shadow: 0 8px 24px #233b321a;
+}
+.list {
+  max-height: min(280px, var(--available-height));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scroll-padding: 4px;
+  padding: 4px;
+}
+.item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 44px;
+  padding: 10px 12px;
+  border-radius: 5px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.item[data-highlighted] {
+  background: var(--accent-soft);
+}
+.indicator {
+  display: flex;
+  align-items: center;
+  color: var(--foreground);
+}
+.empty {
+  padding: 20px 12px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.6;
+  text-align: center;
+}
+.empty:empty {
+  display: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .chips {
+    transition: none;
+  }
+}

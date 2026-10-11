@@ -32,6 +32,7 @@ async function Workspace() {
   if (error || !company) throw new Error("Unable to load workspace.");
   return (
     <SearchWorkspace
+      key={context.recruiter.id}
       company={company.name}
       companyId={context.recruiter.company_id}
       recruiterId={context.recruiter.id}

@@ -22,7 +22,6 @@
   display: flex;
   align-items: center;
   cursor: pointer;
-  outline: none;
   user-select: none;
 }
 .menuItem[data-highlighted],
@@ -78,7 +77,6 @@
   border-radius: 4px;
   font-size: 13px;
   line-height: 1.5;
-  outline: none;
   cursor: pointer;
   user-select: none;
 }
@@ -91,6 +89,6 @@
   display: flex;
   justify-content: center;
   align-items: center;
-  height: 28px;
+  min-height: 44px;
   background: var(--surface);
 }

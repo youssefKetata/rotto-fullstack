@@ -176,7 +176,7 @@ export function CandidateDrawer({
             </section>
           </div>
           <footer className={styles.footer}>
-            <span>Shortlist saved in this tab.</span>
+            <span>Choose a named list for your team.</span>
             <ShortlistButton
               candidate={candidate}
               saved={saved}
