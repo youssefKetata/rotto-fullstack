@@ -3,9 +3,19 @@
 import controls from "./controls.module.css";
 import styles from "./login-form.module.css";
 
-import { useState, type FormEvent } from "react";
+import { useState, useSyncExternalStore, type FormEvent } from "react";
+
+const subscribeToHydration = () => () => {};
+const clientSnapshot = () => true;
+const serverSnapshot = () => false;
 
 export function LoginForm() {
+  // Keep submission disabled until React has attached the JSON submit handler.
+  const hydrated = useSyncExternalStore(
+    subscribeToHydration,
+    clientSnapshot,
+    serverSnapshot,
+  );
   const [showPassword, setShowPassword] = useState(false);
   const [status, setStatus] = useState<"idle" | "submitting" | "navigating">(
     "idle",
@@ -15,7 +25,7 @@ export function LoginForm() {
 
   async function signIn(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (pending) return;
+    if (pending || !hydrated) return;
     const fields = new FormData(event.currentTarget);
     setStatus("submitting");
     setError("");
@@ -45,6 +55,8 @@ export function LoginForm() {
 
   return (
     <form
+      method="post"
+      action="/api/auth/login"
       onSubmit={signIn}
       className={styles["login-form"]}
       aria-busy={pending}
@@ -96,7 +108,7 @@ export function LoginForm() {
         type="submit"
         className={styles["primary-button"] + " " + styles["sign-in-button"]}
         data-pending={pending}
-        disabled={pending}
+        disabled={pending || !hydrated}
         aria-label={pending ? "Signing in" : "Sign in"}
       >
         <span

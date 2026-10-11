@@ -33,6 +33,19 @@ test("Proxy redirects guests before rendering, while login serves the complete f
   assert.ok(html.includes('name="email"'));
   assert.ok(html.includes('name="password"'));
   assert.ok(!html.includes("Loading sign-in"));
+  const form = html.match(/<form\b[^>]*>/)?.[0] ?? "";
+  assert.match(
+    form,
+    /method="post"/,
+    "Native form submission must never put credentials in a URL.",
+  );
+  assert.match(form, /action="\/api\/auth\/login"/);
+  const submit = html.match(/<button\b[^>]*type="submit"[^>]*>/)?.[0] ?? "";
+  assert.match(
+    submit,
+    /\bdisabled(?:=|[ >])/,
+    "Submission stays disabled until hydration attaches the handler.",
+  );
 });
 
 test("login rejects invalid input, wrong credentials and cross-origin requests", async () => {
