@@ -32,6 +32,7 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+/.artifacts/
 
 # vercel
 .vercel
@@ -43,4 +44,5 @@ next-env.d.ts
 
 /data/*
 !/data/candidates.json
+!/data/queries.json
 /candidates.json

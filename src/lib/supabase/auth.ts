@@ -1,3 +1,4 @@
+import type { Database } from "@/lib/supabase/types";
 import "server-only";
 
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
@@ -18,7 +19,7 @@ export async function getRecruiter(request?: Request) {
 
   const { url, key } = getSupabaseConfig();
   const supabase = token
-    ? createSupabaseClient(url, key, {
+    ? createSupabaseClient<Database>(url, key, {
         global: { headers: { Authorization: `Bearer ${token}` } },
         auth: {
           persistSession: false,

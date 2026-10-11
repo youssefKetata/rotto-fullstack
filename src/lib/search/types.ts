@@ -1,15 +1,3 @@
-export type Filters = {
-  role?: string;
-  seniority?: "junior" | "mid" | "senior" | "staff";
-  skills: string[];
-  minYears?: number;
-  city?: string;
-  state?: string;
-  openToWork?: true;
-  companyType?: "startup" | "enterprise";
-  field?: string;
-};
-
 export type Candidate = {
   id: string;
   full_name: string;
@@ -44,6 +32,3 @@ export type Candidate = {
     graduation_year: number | null;
   }[];
 };
-
-export type Sort = "availability" | "experience";
-export type SearchResult = { results: Candidate[]; total: number };

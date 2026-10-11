@@ -27,7 +27,12 @@ const publicTables = [
   "searches",
   "search_results",
 ];
-const privateTables = ["company_usage", "billing_events", "subscriptions"];
+const privateTables = [
+  "company_usage",
+  "billing_events",
+  "subscriptions",
+  "search_executions",
+];
 
 // Stand-ins for Supabase Auth; application migrations run unchanged.
 const bootstrap = `
@@ -333,6 +338,30 @@ test("database schema and recruiter isolation", async (t) => {
         ]),
         [],
       );
+    });
+  });
+
+  await t.test("saved searches are unique within each company", async () => {
+    await asRole(db, "authenticated", acme.user, async () => {
+      await db.exec(`insert into public.saved_briefs (brief, filters)
+        values ('Unique search', '{"version":1,"anyOf":[],"preferred":[],"issues":[]}')`);
+      await expectError(
+        db,
+        `insert into public.saved_briefs (brief, filters)
+        values (' Unique search ', '{"issues":[],"preferred":[],"anyOf":[],"version":1}')`,
+        "23505",
+      );
+      await db.exec(`insert into public.saved_briefs (brief, filters)
+        values ('Unique search', '{"version":1,"anyOf":[{"minYears":2}],"preferred":[],"issues":[]}')`);
+      await db.exec(`insert into public.saved_briefs (brief, filters)
+        values ('A different search', '{"version":1,"anyOf":[],"preferred":[],"issues":[]}')`);
+      await db.exec(`insert into public.saved_briefs (brief, filters)
+        values ('Go engineers', '{"skills":["Go"]}')`);
+      const [count] = await rows(
+        db,
+        "select count(*)::int as n from public.saved_briefs where brief = 'Unique search'",
+      );
+      assert.equal(count.n, 2);
     });
   });
 
