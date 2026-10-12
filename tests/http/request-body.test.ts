@@ -92,3 +92,27 @@ test("an empty unsigned body is read as bytes but is not a valid JSON object", a
     (error: unknown) => error instanceof ApiError && error.status === 400,
   );
 });
+
+test("optional membership bodies accept empty streams while preserving JSON validation", async () => {
+  assert.deepEqual(await readObject(streamedRequest([]), 1000, true), {});
+  assert.deepEqual(
+    await readObject(
+      new Request("http://localhost", { method: "POST" }),
+      1000,
+      true,
+    ),
+    {},
+  );
+  const wrongType = new Request("http://localhost", {
+    method: "POST",
+    body: "{}",
+  });
+  await assert.rejects(
+    readObject(wrongType, 1000, true),
+    (error: unknown) => error instanceof ApiError && error.status === 415,
+  );
+  await assert.rejects(
+    readObject(streamedRequest([new TextEncoder().encode("[")]), 1000, true),
+    (error: unknown) => error instanceof ApiError && error.status === 400,
+  );
+});

@@ -24,7 +24,15 @@ export type Shortlist = {
   updated_at?: string;
 };
 
-export type ShortlistDetail = Shortlist & { people: Candidate[] };
+export type ShortlistMembership = {
+  candidate_id: string;
+  added_at: string;
+  added_by: string;
+};
+export type ShortlistDetail = Shortlist & {
+  people: Candidate[];
+  memberships: ShortlistMembership[];
+};
 
 export type SavedBrief = {
   id: string;

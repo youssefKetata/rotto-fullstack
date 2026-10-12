@@ -26,10 +26,13 @@ export function json(body: object, status = 200) {
 export async function readObject(
   request: Request,
   maxBytes = 32000,
+  allowEmpty = false,
 ): Promise<Record<string, unknown>> {
+  if (allowEmpty && !request.body) return {};
   if (
+    !allowEmpty &&
     request.headers.get("content-type")?.split(";")[0].trim() !==
-    "application/json"
+      "application/json"
   ) {
     throw new ApiError(415, "JSON_REQUIRED", "Send the request as JSON.");
   }
@@ -43,6 +46,14 @@ export async function readObject(
       throw new ApiError(413, "REQUEST_TOO_LARGE", "The request is too large.");
     }
     throw error;
+  }
+  if (allowEmpty && bytes.byteLength === 0) return {};
+  if (
+    allowEmpty &&
+    request.headers.get("content-type")?.split(";")[0].trim() !==
+      "application/json"
+  ) {
+    throw new ApiError(415, "JSON_REQUIRED", "Send the request as JSON.");
   }
   let body: unknown;
   try {

@@ -1,0 +1,31 @@
+.toast {
+  pointer-events: auto;
+  background: var(--surface) !important;
+  color: var(--foreground) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 10px !important;
+  box-shadow: 0 8px 28px #233b3224 !important;
+  font-family: inherit;
+}
+.title {
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.5;
+}
+.action {
+  min-height: 36px;
+  padding: 6px 12px !important;
+  background: var(--accent) !important;
+  color: var(--foreground) !important;
+}
+.error {
+  color: var(--danger) !important;
+}
+@media (max-width: 700px) {
+  :global(body):has(:global([data-slot="dialog-content"])) .toaster {
+    --mobile-offset-bottom: max(
+      104px,
+      calc(env(safe-area-inset-bottom) + 88px)
+    ) !important;
+  }
+}

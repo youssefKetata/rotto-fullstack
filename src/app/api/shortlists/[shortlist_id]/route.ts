@@ -7,6 +7,7 @@ import {
   uuidValue,
   withRecruiter,
 } from "@/lib/api";
+import type { ShortlistMembership } from "@/lib/search/contracts";
 
 type Params = { params: Promise<{ shortlist_id: string }> };
 
@@ -22,20 +23,28 @@ export async function GET(request: Request, { params }: Params) {
     if (!data)
       throw new ApiError(404, "NOT_FOUND", "This shortlist was not found.");
     const people: object[] = [];
+    const memberships: ShortlistMembership[] = [];
     for (let offset = 0; ; offset += 1000) {
       const page = await supabase
         .from("shortlist_people")
         .select(
-          "candidate_id,person:candidates(*,experiences:candidate_experiences(*),education:candidate_education(*))",
+          "candidate_id,added_at,added_by,person:candidates(*,experiences:candidate_experiences(*),education:candidate_education(*))",
         )
         .eq("shortlist_id", id)
         .order("candidate_id")
         .range(offset, offset + 999);
       if (page.error) throw new Error("Shortlist people read failed");
       people.push(...(page.data ?? []).map((row) => row.person));
+      memberships.push(
+        ...(page.data ?? []).map(({ candidate_id, added_at, added_by }) => ({
+          candidate_id,
+          added_at,
+          added_by,
+        })),
+      );
       if ((page.data?.length ?? 0) < 1000) break;
     }
-    return json({ ...data, people });
+    return json({ ...data, people, memberships });
   });
 }
 
