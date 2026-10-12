@@ -203,6 +203,7 @@ export type Database = {
           created_by: string;
           filters: NonNullable<Json>;
           id: string;
+          name: string | null;
         };
         Insert: {
           brief: string;
@@ -211,6 +212,7 @@ export type Database = {
           created_by?: string;
           filters: NonNullable<Json>;
           id?: string;
+          name?: string | null;
         };
         Update: {
           brief?: string;
@@ -219,6 +221,7 @@ export type Database = {
           created_by?: string;
           filters?: NonNullable<Json>;
           id?: string;
+          name?: string | null;
         };
         Relationships: [
           {

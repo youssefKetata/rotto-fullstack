@@ -39,6 +39,10 @@ export type SavedBrief = {
   brief: string;
   filters: SearchFilters;
   created_at?: string;
+  name?: string | null;
+  last_search_id?: string | null;
+  last_result_count?: number | null;
+  last_searched_at?: string | null;
 };
 
 export const SEARCH_PAGE_SIZE = 20;

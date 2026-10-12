@@ -7,15 +7,11 @@ import {
   withRecruiter,
 } from "@/lib/api";
 import { validateSearchFilters } from "@/lib/search/schema";
+import { savedBriefsForRecruiter } from "@/lib/search/saved-briefs";
 
 export async function GET(request: Request) {
-  return withRecruiter(request, async ({ supabase }) => {
-    const { data, error } = await supabase
-      .from("saved_briefs")
-      .select("id,brief,filters,created_at")
-      .order("created_at", { ascending: false });
-    if (error) throw new Error("Saved searches read failed");
-    return json(data ?? []);
+  return withRecruiter(request, async ({ recruiter }) => {
+    return json(await savedBriefsForRecruiter(recruiter.id));
   });
 }
 
@@ -46,9 +42,18 @@ export async function POST(request: Request) {
         .eq("filters", JSON.stringify(filters))
         .single();
       if (existing.error) throw new Error("Saved search read failed");
-      return json(existing.data);
+      return json(
+        (await savedBriefsForRecruiter(recruiter.id)).find(
+          (saved) => saved.id === existing.data.id,
+        )!,
+      );
     }
     if (error) throw new Error("Saving search failed");
-    return json(data, 201);
+    return json(
+      (await savedBriefsForRecruiter(recruiter.id)).find(
+        (saved) => saved.id === data.id,
+      )!,
+      201,
+    );
   });
 }

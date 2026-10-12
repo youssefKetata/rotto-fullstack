@@ -207,6 +207,10 @@ test("Bearer APIs, company isolation, quota, paging and signed billing", async (
       assert.equal(detail.people.length, 1);
       assert.ok(detail.people[0].experiences.length);
       assert.ok(detail.people[0].education.length);
+      assert.equal(detail.memberships.length, 1);
+      assert.equal(detail.memberships[0].candidate_id, "cand_0001");
+      assert.equal(detail.memberships[0].added_by, a.user);
+      assert.ok(Number.isFinite(Date.parse(detail.memberships[0].added_at)));
       await request(`/api/shortlists/${list}`, {
         method: "PATCH",
         body: { name: "Renamed shortlist" },
@@ -240,6 +244,8 @@ test("Bearer APIs, company isolation, quota, paging and signed billing", async (
         ["POST", `/api/shortlists/${list}/people/cand_0002`],
         ["DELETE", `/api/shortlists/${list}/people/cand_0001`],
         ["POST", `/api/saved-briefs/${saved}/rerun`, {}],
+        ["PATCH", `/api/saved-briefs/${saved}`, { name: "Stolen" }],
+        ["DELETE", `/api/saved-briefs/${saved}`],
       ])
         await request(path, { as: b, method, body, status: 404 });
       assert.deepEqual((await request("/api/shortlists", { as: b })).data, []);
@@ -346,6 +352,16 @@ test("Bearer APIs, company isolation, quota, paging and signed billing", async (
       assert.ok(search.total > 1000);
       assert.equal(search.results.length, 20);
       assert.equal(search.searches_remaining, 0);
+      const savedRows = (await request("/api/saved-briefs")).data;
+      const last = savedRows.find((row) => row.id === saved);
+      assert.equal(last.last_search_id, search.search_id);
+      assert.equal(last.last_result_count, search.total);
+      assert.ok(Number.isFinite(Date.parse(last.last_searched_at)));
+      assert.ok(
+        savedRows
+          .filter((row) => row.id !== saved)
+          .every((row) => row.last_search_id === null),
+      );
       const replay = (
         await request(`/api/saved-briefs/${saved}/rerun`, {
           method: "POST",
@@ -443,6 +459,42 @@ test("Bearer APIs, company isolation, quota, paging and signed billing", async (
       const [event] =
         await sql`select count(*)::int as n from private.billing_events where event_id=${id}`;
       assert.equal(event.n, 1);
+    },
+  );
+
+  await t.test(
+    "saved searches can be named and removed without altering results or quota",
+    async () => {
+      const renamed = await request(`/api/saved-briefs/${saved}`, {
+        method: "PATCH",
+        body: { name: " Experienced engineers " },
+      });
+      assert.equal(renamed.data.name, "Experienced engineers");
+      const row = (await request("/api/saved-briefs")).data.find(
+        (item) => item.id === saved,
+      );
+      assert.equal(row.name, "Experienced engineers");
+      assert.equal(row.brief, "At least one year of experience");
+      assert.deepEqual(row.filters, filters);
+      assert.notEqual(row.last_search_id, search.search_id);
+      await request(`/api/saved-briefs/${saved}`, {
+        method: "PATCH",
+        body: { name: "" },
+        status: 400,
+      });
+      await request(`/api/saved-briefs/${saved}`, {
+        method: "PATCH",
+        body: { name: "x", filters },
+        status: 400,
+      });
+      await request(`/api/saved-briefs/${saved}`, { method: "DELETE" });
+      assert.ok(
+        !(await request("/api/saved-briefs")).data.some(
+          (item) => item.id === saved,
+        ),
+      );
+      await request(`/api/search/${row.last_search_id}`);
+      assert.equal((await request("/api/plan")).data.searches_remaining, 0);
     },
   );
 

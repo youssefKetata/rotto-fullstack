@@ -300,6 +300,14 @@ test("database schema and recruiter isolation", async (t) => {
           assert.deepEqual(
             await rows(
               db,
+              "update public.saved_briefs set name = 'Intrusion' where id = $1 returning id",
+              [other.saved],
+            ),
+            [],
+          );
+          assert.deepEqual(
+            await rows(
+              db,
               "delete from public.shortlist_people where shortlist_id = $1 returning candidate_id",
               [other.shortlist],
             ),
@@ -329,6 +337,22 @@ test("database schema and recruiter isolation", async (t) => {
       );
       assert.equal(saved.company_id, acme.company);
       assert.equal(saved.created_by, acme.user);
+      const [renamed] = await rows(
+        db,
+        "update public.saved_briefs set name = 'React engineers' where id = $1 returning name,brief",
+        [saved.id],
+      );
+      assert.deepEqual(renamed, { name: "React engineers", brief: "React" });
+      await expectError(
+        db,
+        `update public.saved_briefs set brief = 'Different brief' where id = '${saved.id}'`,
+        "42501",
+      );
+      await expectError(
+        db,
+        `update public.saved_briefs set name = '' where id = '${saved.id}'`,
+        "23514",
+      );
       await db.query("delete from public.saved_briefs where id = $1", [
         saved.id,
       ]);
