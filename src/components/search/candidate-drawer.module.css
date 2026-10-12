@@ -60,6 +60,30 @@
   overflow-y: auto;
   overscroll-behavior: contain;
   padding: 32px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--control-border) transparent;
+  scrollbar-gutter: stable;
+}
+@supports selector(::-webkit-scrollbar) {
+  .content {
+    scrollbar-width: auto;
+    scrollbar-color: auto;
+  }
+  .content::-webkit-scrollbar {
+    width: 6px;
+  }
+  .content::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .content::-webkit-scrollbar-thumb {
+    border-radius: 8px;
+    background: var(--control-border);
+  }
+  .content::-webkit-scrollbar-button {
+    display: none;
+    width: 0;
+    height: 0;
+  }
 }
 .profile h2 {
   font-size: 28px;
@@ -79,13 +103,6 @@
   line-height: 1.6;
 }
 .open {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  background: var(--accent-soft);
-  border-radius: 4px;
-  padding: 5px 8px;
   margin-top: 12px;
 }
 .section {
@@ -147,9 +164,106 @@
   border-top: 1px solid var(--border);
   background: var(--background);
 }
-.footer > span {
+.membership {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  min-width: 0;
+}
+.membership > span {
   color: var(--muted);
-  font-size: 11px;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+.changeLists {
+  padding: 4px 6px;
+  min-height: 32px;
+  border: 0;
+  background: transparent;
+  font-size: 13px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.shortlistAction {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  flex-shrink: 0;
+  min-height: 44px;
+  border: 0;
+  border-radius: 6px;
+  padding: 0 12px;
+  background: transparent;
+  font-size: 13px;
+}
+.shortlistAction:hover,
+.changeLists:hover {
+  background: var(--hover);
+}
+.shortlistAction:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+.shortlistAction[data-remove] {
+  color: var(--muted);
+}
+.listPicker {
+  width: min(300px, calc(100vw - 32px));
+  max-width: var(--radix-popover-content-available-width);
+  max-height: min(340px, var(--radix-popover-content-available-height));
+  overflow-y: auto;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--foreground);
+  box-shadow: 0 12px 36px #233b3224;
+  z-index: 70;
+}
+.listPicker h3 {
+  font-size: 13px;
+  font-weight: 600;
+  margin: 4px 8px 8px;
+}
+.listPicker button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  min-height: 44px;
+  padding: 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  font-size: 13px;
+  text-align: left;
+}
+.listPicker button span {
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+.listPicker button svg {
+  flex-shrink: 0;
+}
+.listPicker button[aria-pressed="true"] {
+  background: var(--accent-soft);
+}
+.listPicker button:hover {
+  background: var(--hover);
+}
+.listPicker button:disabled {
+  opacity: 0.6;
+}
+.listPicker p {
+  margin: 8px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.pickerError {
+  color: var(--danger);
 }
 @keyframes arrive {
   from {

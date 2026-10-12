@@ -28,9 +28,11 @@ export function WorkspaceOverlays({
     matched,
     savedIds,
     closePerson,
-    openPicker,
-    visible,
+    profilePeople,
     openPerson,
+    refreshMemberships,
+    currentList,
+    view,
     picker,
     pickerPending,
     setPicker,
@@ -55,6 +57,61 @@ export function WorkspaceOverlays({
   } = workspace;
   return (
     <>
+      {workspace.savedName && (
+        <NameDialog
+          key={workspace.savedName.id}
+          title="Rename saved search"
+          searchName
+          initial={
+            workspace.savedName.name || workspace.savedName.brief.slice(0, 100)
+          }
+          pending={workspace.savedPending}
+          error={workspace.savedError}
+          onSave={(name) => void workspace.editSaved(name)}
+          onClose={() => {
+            if (!workspace.savedPending) workspace.setSavedName(null);
+          }}
+        />
+      )}
+      {workspace.savedRemoval && (
+        <WorkspaceDialog
+          title="Remove saved search?"
+          description="Previous results remain available. This removes the saved brief from your team’s collection."
+          onClose={() => {
+            if (!workspace.savedPending) workspace.setSavedRemoval(null);
+          }}
+        >
+          <div className={styles.upgradeContent}>
+            <p>{workspace.savedRemoval.name || workspace.savedRemoval.brief}</p>
+            {workspace.savedError && (
+              <p role="alert" className={styles.dialogError}>
+                {workspace.savedError}
+              </p>
+            )}
+            <footer>
+              <button
+                type="button"
+                disabled={workspace.savedPending}
+                onClick={() => workspace.setSavedRemoval(null)}
+              >
+                Keep search
+              </button>
+              <button
+                className={styles.dangerButton}
+                type="button"
+                disabled={workspace.savedPending}
+                onClick={() => void workspace.editSaved()}
+              >
+                <PendingLabel
+                  pending={workspace.savedPending}
+                  idle="Remove saved search"
+                  loading="Removing…"
+                />
+              </button>
+            </footer>
+          </div>
+        </WorkspaceDialog>
+      )}
       {editFilters && filters && (
         <FilterEditor
           filters={filters}
@@ -77,14 +134,32 @@ export function WorkspaceOverlays({
           matched={matched}
           saved={savedIds.has(candidate.id)}
           onClose={closePerson}
-          onToggle={(person) => void openPicker(person)}
-          position={visible.findIndex((person) => person.id === candidate.id)}
-          total={visible.length}
+          lists={lists}
+          memberListIds={lists
+            .filter((list) =>
+              listPeople[list.id]?.some((person) => person.id === candidate.id),
+            )
+            .map((list) => list.id)}
+          currentList={view === "shortlists" ? currentList : undefined}
+          membershipPending={pickerPending}
+          membershipError={dialogError}
+          onRefreshMemberships={() => void refreshMemberships()}
+          onMembership={(list, person, remove) =>
+            void membership(list, person, remove)
+          }
+          onCreateList={() => {
+            setDialogError("");
+            setNameAction({ kind: "create" });
+          }}
+          position={profilePeople.findIndex(
+            (person) => person.id === candidate.id,
+          )}
+          total={profilePeople.length}
           onStep={(direction) => {
-            const index = visible.findIndex(
+            const index = profilePeople.findIndex(
               (person) => person.id === candidate.id,
             );
-            const next = visible[index + direction];
+            const next = profilePeople[index + direction];
             if (next) void openPerson(next);
           }}
         />
@@ -174,8 +249,8 @@ export function WorkspaceOverlays({
       )}
       {deleteList && (
         <WorkspaceDialog
-          title={`Delete “${deleteList.name}”?`}
-          description="This removes the list and its saved memberships. Candidate profiles remain available."
+          title={`Delete “${deleteList.name}” and its ${listPeople[deleteList.id]?.length ?? 0} ${(listPeople[deleteList.id]?.length ?? 0) === 1 ? "person" : "people"}?`}
+          description="This removes the list and its memberships. Candidate profiles remain available."
           onClose={() => {
             if (!collectionPending) setDeleteList(null);
           }}
@@ -209,7 +284,7 @@ export function WorkspaceOverlays({
       {upgrade && (
         <UpgradeDialog
           onClose={() => setUpgrade(false)}
-          onRefresh={() => void refreshPlan()}
+          onRefresh={async () => (await refreshPlan())?.plan ?? null}
           refreshing={planPending}
         />
       )}

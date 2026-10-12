@@ -28,16 +28,27 @@ export function useSearchWorkspace({
 }: WorkspaceIdentity) {
   const [brief, setBrief] = useState("");
   const [search, setSearch] = useState<SearchResponse | null>(null);
+  const [previousSearchId, setPreviousSearchId] = useState<string | null>(null);
   const [filters, setFilters] = useState<SearchFilters | null>(null);
   const [plan, setPlan] = useState<CompanyPlan | null>(null);
   const [view, setView] = useState<"search" | "shortlists" | "saved">("search");
 
   const [savedBriefs, setSavedBriefs] = useState<SavedBrief[]>([]);
+  const [savedName, setSavedName] = useState<SavedBrief | null>(null);
+  const [savedRemoval, setSavedRemoval] = useState<SavedBrief | null>(null);
+  const [savedPending, setSavedPending] = useState(false);
+  const [savedError, setSavedError] = useState("");
+  const savedBusy = useRef(false);
   const [candidate, setCandidate] = useState<Candidate | null>(null);
+  const [drawerSnapshot, setDrawerSnapshot] = useState<{
+    people: Candidate[];
+    listId: string | null;
+  } | null>(null);
 
   const [editFilters, setEditFilters] = useState(false);
   const [upgrade, setUpgrade] = useState(false);
   const [pending, setPending] = useState(false);
+  const [pendingPath, setPendingPath] = useState<string | null>(null);
   const [paging, setPaging] = useState(false);
 
   const [saving, setSaving] = useState(false);
@@ -61,6 +72,10 @@ export function useSearchWorkspace({
     !!filters &&
     JSON.stringify(filters) !== JSON.stringify(search.filters);
   const exhausted = plan?.plan === "free" && plan.searches_remaining === 0;
+  const rerunning = savedBriefs.find(
+    (saved) =>
+      pendingPath === `/api/saved-briefs/${encodeURIComponent(saved.id)}/rerun`,
+  );
   const searchSaved =
     !!search &&
     !!filters &&
@@ -69,10 +84,18 @@ export function useSearchWorkspace({
         savedSearchKey(saved) ===
         savedSearchKey({ brief: search.brief, filters }),
     );
-  const visible =
+  const liveVisible =
     view === "shortlists"
       ? (listPeople[activeList ?? ""] ?? [])
       : (search?.results ?? []);
+  const visible =
+    candidate &&
+    view === "shortlists" &&
+    drawerSnapshot &&
+    drawerSnapshot.listId === activeList
+      ? drawerSnapshot.people
+      : liveVisible;
+  const profilePeople = drawerSnapshot?.people ?? liveVisible;
   const matched = requestedSkills(search?.filters ?? null);
   const currentList = lists.find((list) => list.id === activeList);
   const savedIds = new Set(
@@ -86,10 +109,11 @@ export function useSearchWorkspace({
       ? "Paid plan · New searches and refinements available."
       : exhausted
         ? "Free search used · Your results and lists stay available."
-        : "1 free search for your company · Refinements and reruns count as searches.";
+        : "Your company’s first search is free · 1 search remaining.";
 
   const accept = useCallback((result: SearchResponse) => {
     setSearch(result);
+    setPreviousSearchId(result.search_id);
     setFilters(structuredClone(result.filters));
     setBrief(result.brief);
     setPlan({
@@ -98,6 +122,7 @@ export function useSearchWorkspace({
     });
     setView("search");
     setCandidate(null);
+    setDrawerSnapshot(null);
     setError("");
     setPageError("");
     updateWorkspaceUrl(result.search_id);
@@ -112,17 +137,31 @@ export function useSearchWorkspace({
       const next = await searchApi<CompanyPlan>("/api/plan");
       setPlan(next);
       if (next.plan === "paid") setUpgrade(false);
+      return next;
     } catch (cause) {
       setError(message(cause));
+      return null;
     } finally {
       setPlanPending(false);
     }
   }
+  const clearSearch = useCallback(() => {
+    setSearch(null);
+    setFilters(null);
+    setView("search");
+    setCandidate(null);
+    setDrawerSnapshot(null);
+    setError("");
+    setPageError("");
+  }, []);
   const ready = useWorkspaceSession({
     companyId,
     recruiterId,
     brief,
     search,
+    previousSearchId,
+    setPreviousSearchId,
+    clearSearch,
     setBrief,
     setPlan,
     setLists,
@@ -139,6 +178,12 @@ export function useSearchWorkspace({
     if (busy.current) return;
     busy.current = true;
     setPending(true);
+    setPendingPath(operation.path);
+    const saved = savedBriefs.find(
+      (item) =>
+        operation.path ===
+        `/api/saved-briefs/${encodeURIComponent(item.id)}/rerun`,
+    );
     setError("");
     setRetry(null);
     try {
@@ -150,6 +195,7 @@ export function useSearchWorkspace({
       accept(result);
       lastOperation.current = null;
     } catch (cause) {
+      if (saved) setView("saved");
       setError(message(cause));
       if (cause instanceof SearchApiError && cause.status === 402) {
         setPlan({ plan: "free", searches_remaining: 0 });
@@ -163,6 +209,7 @@ export function useSearchWorkspace({
     } finally {
       busy.current = false;
       setPending(false);
+      setPendingPath(null);
       void refreshPlan();
     }
   }
@@ -212,6 +259,11 @@ export function useSearchWorkspace({
     }
   }
   async function openPerson(person: Candidate) {
+    if (!candidate)
+      setDrawerSnapshot({
+        people: [...visible],
+        listId: view === "shortlists" ? activeList : null,
+      });
     profileRequest.current?.abort();
     const controller = new AbortController();
     profileRequest.current = controller;
@@ -233,6 +285,7 @@ export function useSearchWorkspace({
   function closePerson() {
     profileRequest.current?.abort();
     setCandidate(null);
+    setDrawerSnapshot(null);
     updateWorkspaceUrl(search?.search_id ?? null);
   }
   async function saveSearch() {
@@ -285,6 +338,50 @@ export function useSearchWorkspace({
     setError("");
     if (activeList) void shortlists.selectList(activeList);
   }
+  async function showSaved() {
+    setView("saved");
+    setError("");
+    try {
+      setSavedBriefs(await searchApi<SavedBrief[]>("/api/saved-briefs"));
+    } catch (cause) {
+      setError(message(cause));
+    }
+  }
+  async function editSaved(name?: string) {
+    const target = name === undefined ? savedRemoval : savedName;
+    if (!target || savedBusy.current) return;
+    savedBusy.current = true;
+    setSavedPending(true);
+    setSavedError("");
+    try {
+      const result = await searchApi<{ name?: string }>(
+        `/api/saved-briefs/${encodeURIComponent(target.id)}`,
+        {
+          method: name === undefined ? "DELETE" : "PATCH",
+          ...(name === undefined ? {} : { body: JSON.stringify({ name }) }),
+        },
+      );
+      setSavedBriefs((previous) =>
+        name === undefined
+          ? previous.filter((saved) => saved.id !== target.id)
+          : previous.map((saved) =>
+              saved.id === target.id ? { ...saved, name: result.name } : saved,
+            ),
+      );
+      setSavedName(null);
+      setSavedRemoval(null);
+      setNotice(
+        name === undefined
+          ? "Saved search removed. Results remain available."
+          : "Saved search renamed.",
+      );
+    } catch (cause) {
+      setSavedError(message(cause));
+    } finally {
+      savedBusy.current = false;
+      setSavedPending(false);
+    }
+  }
 
   return {
     ...shortlists,
@@ -297,17 +394,28 @@ export function useSearchWorkspace({
     view,
     setView,
     savedBriefs,
+    savedName,
+    setSavedName,
+    savedRemoval,
+    setSavedRemoval,
+    savedPending,
+    savedError,
+    setSavedError,
+    editSaved,
+    showSaved,
     candidate,
     editFilters,
     setEditFilters,
     upgrade,
     setUpgrade,
     pending,
+    rerunning,
     paging,
     saving,
     searchSaved,
     planPending,
     ready,
+    previousSearchId,
     error,
     setError,
     notice,
@@ -318,6 +426,7 @@ export function useSearchWorkspace({
     adjusted,
     exhausted,
     visible,
+    profilePeople,
     matched,
     currentList,
     savedIds,

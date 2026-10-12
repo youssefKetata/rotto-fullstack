@@ -1,4 +1,15 @@
-import type { SearchCriteria, SearchFilters } from "@/lib/search/schema";
+import {
+  searchAliases,
+  type SearchCriteria,
+  type SearchFilters,
+} from "@/lib/search/schema";
+
+export function stateLabel(state: string) {
+  const name = Object.entries(searchAliases.states).find(
+    ([, code]) => code === state,
+  )?.[0];
+  return name ? name.replace(/\b\w/g, (letter) => letter.toUpperCase()) : state;
+}
 
 export type TokenState = "required" | "preferred" | "exclude";
 export type TokenRef = {
@@ -108,6 +119,35 @@ export function removeEditorTokens(filters: SearchFilters, refs: TokenRef[]) {
   return ordered.reduce(removeEditorToken, filters);
 }
 
+/** Unconfigured cards are editor placeholders, never search conditions. */
+export function removeEmptyEditorRecords(filters: SearchFilters) {
+  const next = structuredClone(filters);
+  for (const criteria of [...next.anyOf, ...next.preferred]) {
+    if (criteria.experience) {
+      criteria.experience = criteria.experience.filter(
+        (job) =>
+          job.scope !== "any" ||
+          job.companyTypes?.length ||
+          job.companies?.length ||
+          job.titles?.length,
+      );
+      if (!criteria.experience.length) delete criteria.experience;
+    }
+    if (criteria.education) {
+      criteria.education = criteria.education.filter(
+        (item) =>
+          item.fields?.length ||
+          item.degrees?.length ||
+          item.schools?.length ||
+          item.minGraduationYear !== undefined ||
+          item.maxGraduationYear !== undefined,
+      );
+      if (!criteria.education.length) delete criteria.education;
+    }
+  }
+  return next;
+}
+
 /** Moves only the selected value; untouched compound rules keep their original semantics. */
 export function changeTokenState(
   filters: SearchFilters,
@@ -172,7 +212,7 @@ export function locationLabel(value: {
 }) {
   return [
     value.city,
-    value.state,
+    value.state ? stateLabel(value.state) : undefined,
     value.country ? humanize(value.country) : undefined,
   ]
     .filter(Boolean)

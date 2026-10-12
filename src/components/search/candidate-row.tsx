@@ -1,7 +1,11 @@
 "use client";
 
 import { useState } from "react";
+import { Popover } from "radix-ui";
 import type { Candidate } from "@/lib/search/types";
+import type { SearchExperience } from "@/lib/search/schema";
+import type { ShortlistMembership } from "@/lib/search/contracts";
+import { workHistoryEvidence } from "./work-history-evidence";
 import { Icon } from "./icon";
 import styles from "./candidate-row.module.css";
 
@@ -41,23 +45,46 @@ export function ShortlistButton({
   candidate,
   saved,
   onToggle,
+  remove = false,
+  disabled = false,
 }: {
   candidate: Candidate;
   saved: boolean;
   onToggle: (candidate: Candidate) => void;
+  remove?: boolean;
+  disabled?: boolean;
 }) {
   return (
     <button
       className={styles.save}
       data-saved={saved}
+      data-remove={remove}
+      disabled={disabled}
       type="button"
-      aria-label={`${saved ? "Remove" : "Shortlist"} ${candidate.full_name}${saved ? " from shortlist" : ""}`}
-      aria-pressed={saved}
+      aria-label={
+        remove
+          ? `Remove ${candidate.full_name} from this shortlist`
+          : `${saved ? "Manage shortlists for" : "Shortlist"} ${candidate.full_name}`
+      }
+      aria-pressed={remove ? undefined : saved}
       onClick={() => onToggle(candidate)}
     >
-      <Icon name={saved ? "check" : "bookmark"} size={18} />
-      <span>{saved ? "Shortlisted" : "Shortlist"}</span>
+      <Icon
+        name={remove ? "close" : "bookmark"}
+        size={18}
+        filled={saved && !remove}
+      />
+      <span>{remove ? "Remove" : saved ? "Shortlisted" : "Shortlist"}</span>
     </button>
+  );
+}
+
+export function AvailabilityStatus() {
+  return (
+    <span className={styles.availability}>
+      <span aria-hidden="true" />
+      Open to work
+    </span>
   );
 }
 
@@ -65,10 +92,12 @@ export function SkillTags({
   skills,
   matched,
   limit,
+  candidateName,
 }: {
   skills: string[];
   matched: string[];
   limit?: number;
+  candidateName?: string;
 }) {
   const ordered = [
     ...skills.filter((s) => matched.includes(s)),
@@ -88,7 +117,33 @@ export function SkillTags({
         </span>
       ))}
       {limit && skills.length > limit ? (
-        <span className={styles.more}>+{skills.length - limit}</span>
+        <Popover.Root>
+          <Popover.Trigger asChild>
+            <button
+              className={styles.more}
+              type="button"
+              aria-label={`Show ${skills.length - limit} more ${skills.length - limit === 1 ? "skill" : "skills"}${candidateName ? ` for ${candidateName}` : ""}`}
+            >
+              +{skills.length - limit}
+            </button>
+          </Popover.Trigger>
+          <Popover.Portal>
+            <Popover.Content
+              className={styles.skillPopover}
+              side="bottom"
+              align="start"
+              sideOffset={6}
+              collisionPadding={16}
+              aria-label="More skills"
+            >
+              <ul>
+                {ordered.slice(limit).map((skill) => (
+                  <li key={skill}>{skill}</li>
+                ))}
+              </ul>
+            </Popover.Content>
+          </Popover.Portal>
+        </Popover.Root>
       ) : null}
     </div>
   );
@@ -101,6 +156,11 @@ export function CandidateRow({
   selected,
   onOpen,
   onToggle,
+  remove = false,
+  membershipPending = false,
+  workRequirements,
+  membership,
+  recruiterId,
 }: {
   candidate: Candidate;
   matched: string[];
@@ -108,18 +168,24 @@ export function CandidateRow({
   selected: boolean;
   onOpen: (candidate: Candidate) => void;
   onToggle: (candidate: Candidate) => void;
+  remove?: boolean;
+  membershipPending?: boolean;
+  workRequirements?: SearchExperience[];
+  membership?: ShortlistMembership;
+  recruiterId?: string;
 }) {
+  const evidence = workHistoryEvidence(candidate, workRequirements);
   return (
     <li className={styles.row} data-selected={selected}>
-      <button
-        className={styles.open}
-        type="button"
-        onClick={() => onOpen(candidate)}
-        aria-label={`View ${candidate.full_name}, ${candidate.current_title}`}
-        aria-haspopup="dialog"
-      >
-        <ProfileImage src={candidate.avatar_url} name={candidate.full_name} />
-        <span className={styles.info}>
+      <ProfileImage src={candidate.avatar_url} name={candidate.full_name} />
+      <div className={styles.info}>
+        <button
+          className={styles.open}
+          type="button"
+          onClick={() => onOpen(candidate)}
+          aria-label={`View ${candidate.full_name}, ${candidate.current_title}`}
+          aria-haspopup="dialog"
+        >
           <span className={styles.name}>{candidate.full_name}</span>
           <span className={styles.title}>
             {candidate.current_title}
@@ -132,28 +198,49 @@ export function CandidateRow({
             {candidate.current_company}
           </span>
           <span className={styles.meta}>
-            <span className={styles.seniority}>
-              {candidate.seniority === "mid"
-                ? "Mid-level"
-                : candidate.seniority}
-            </span>
-            <span aria-hidden="true">·</span>
             {candidate.years_experience} years<span aria-hidden="true">·</span>
             {candidate.city}, {candidate.state}
-            {candidate.open_to_work && (
-              <span className={styles.availability}>
-                <span aria-hidden="true" />
-                Open to work
-              </span>
-            )}
+            {candidate.open_to_work && <AvailabilityStatus />}
           </span>
-          <SkillTags skills={candidate.skills} matched={matched} limit={4} />
-        </span>
-      </button>
+          {evidence.length > 0 && (
+            <span className={styles.evidence}>
+              {evidence
+                .map(
+                  (job) =>
+                    `${job.company_type === "enterprise" ? "Enterprise" : "Startup"} · ${job.company_name} (${job.end_year === null ? "current" : "past"})`,
+                )
+                .join("; ")}
+            </span>
+          )}
+          {membership && (
+            <span className={styles.evidence}>
+              Added by{" "}
+              {membership.added_by === recruiterId ? "you" : "a teammate"} ·{" "}
+              <time
+                dateTime={membership.added_at}
+                title={new Date(membership.added_at).toLocaleString()}
+              >
+                {new Date(membership.added_at).toLocaleDateString("en-US", {
+                  month: "short",
+                  day: "numeric",
+                })}
+              </time>
+            </span>
+          )}
+        </button>
+        <SkillTags
+          skills={candidate.skills}
+          matched={matched}
+          limit={4}
+          candidateName={candidate.full_name}
+        />
+      </div>
       <ShortlistButton
         candidate={candidate}
         saved={saved}
         onToggle={onToggle}
+        remove={remove}
+        disabled={membershipPending}
       />
     </li>
   );

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useId, useRef, useState, type ReactNode, type RefObject } from "react";
 import {
   Dialog,
   DialogContent,
@@ -32,11 +32,13 @@ export function WorkspaceDialog({
   description,
   onClose,
   children,
+  initialFocus,
 }: {
   title: string;
   description: ReactNode;
   onClose: () => void;
   children: ReactNode;
+  initialFocus?: RefObject<HTMLInputElement | null>;
 }) {
   return (
     <Dialog
@@ -45,7 +47,16 @@ export function WorkspaceDialog({
         if (!open) onClose();
       }}
     >
-      <DialogContent className={styles.smallDialog} onBackdropClick={onClose}>
+      <DialogContent
+        className={styles.smallDialog}
+        onBackdropClick={onClose}
+        onOpenAutoFocus={(event) => {
+          if (initialFocus?.current) {
+            event.preventDefault();
+            initialFocus.current.focus();
+          }
+        }}
+      >
         <header>
           <div>
             <DialogTitle asChild>
@@ -72,20 +83,29 @@ export function NameDialog({
   error,
   onSave,
   onClose,
+  searchName = false,
 }: {
   title: string;
   initial?: string;
+  searchName?: boolean;
   pending: boolean;
   error: string;
   onSave: (name: string) => void;
   onClose: () => void;
 }) {
   const [name, setName] = useState(initial);
+  const nameInput = useRef<HTMLInputElement>(null);
+  const nameId = useId();
   return (
     <WorkspaceDialog
       title={title}
-      description="A name that helps your team find these people again."
+      description={
+        searchName
+          ? "The brief and requirements stay the same."
+          : "A name that helps your team find these people again."
+      }
       onClose={onClose}
+      initialFocus={nameInput}
     >
       <form
         className={styles.nameForm}
@@ -94,14 +114,19 @@ export function NameDialog({
           if (!pending && name.trim()) onSave(name.trim());
         }}
       >
-        <label htmlFor="shortlist-name">
-          List name
+        <label htmlFor={nameId}>
+          {searchName ? "Search name" : "List name"}
           <input
-            id="shortlist-name"
+            id={nameId}
+            ref={nameInput}
             value={name}
             maxLength={100}
             onChange={(event) => setName(event.target.value)}
-            placeholder="e.g. Frontend shortlist"
+            placeholder={
+              searchName
+                ? "e.g. Staff engineers in Texas"
+                : "e.g. Frontend shortlist"
+            }
             autoFocus
             disabled={pending}
           />
@@ -122,7 +147,7 @@ export function NameDialog({
           >
             <PendingLabel
               pending={pending}
-              idle="Save list"
+              idle={searchName ? "Save name" : "Save list"}
               loading="Saving…"
             />
           </button>
@@ -138,36 +163,49 @@ export function UpgradeDialog({
   refreshing,
 }: {
   onClose: () => void;
-  onRefresh: () => void;
+  onRefresh: () => Promise<"free" | "paid" | null>;
   refreshing: boolean;
 }) {
+  const [feedback, setFeedback] = useState("");
   return (
     <WorkspaceDialog
-      title="Keep the search going."
-      description="Your company’s free plan includes one search in total."
+      title="Your free search is used"
+      description="Ask your workspace administrator to activate a paid plan for new searches."
       onClose={onClose}
     >
       <div className={styles.upgradeContent}>
-        <p>
-          An active subscription unlocks new searches, requirement changes, and
-          saved-search reruns. Your existing results, profiles, saved searches,
-          and lists stay available.
-        </p>
-        <p>
-          For this assessment, subscriptions are updated through verified Stripe
-          events. There is no checkout to complete.
+        <p>You can still browse your results and manage shortlists.</p>
+        <p
+          className={styles.upgradeStatus}
+          role="status"
+          aria-live="polite"
+          aria-atomic="true"
+        >
+          {refreshing
+            ? "Checking your company’s plan…"
+            : feedback || "Already activated? Check your plan."}
         </p>
         <footer>
-          <button type="button" onClick={onClose}>
-            Back to workspace
-          </button>
           <button
             className={styles.primaryButton}
             type="button"
             disabled={refreshing}
-            onClick={onRefresh}
+            onClick={async () => {
+              const plan = await onRefresh();
+              setFeedback(
+                plan === "free"
+                  ? "Still on the free plan."
+                  : plan === null
+                    ? "We couldn’t check your plan. Please try again."
+                    : "Your paid plan is active.",
+              );
+            }}
           >
-            {refreshing ? "Checking…" : "Refresh plan"}
+            <PendingLabel
+              pending={refreshing}
+              idle="Check plan"
+              loading="Checking…"
+            />
           </button>
         </footer>
       </div>

@@ -45,8 +45,8 @@ export function LoginForm() {
         return;
       }
       setStatus("navigating");
-      // Start a fresh session view without restoring cached guest routes.
-      window.location.replace("/");
+      // A new sign-in starts with an empty brief; resuming is a separate action.
+      window.location.replace("/?new=1");
     } catch {
       setError("Unable to connect. Check your connection and try again.");
       setStatus("idle");

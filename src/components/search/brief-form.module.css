@@ -7,12 +7,6 @@
   text-align: center;
   margin-bottom: 36px;
 }
-.eyebrow {
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 1.7px;
-  color: var(--muted);
-}
 .heading h1 {
   font-size: clamp(34px, 4vw, 44px);
   font-weight: 500;
@@ -43,7 +37,19 @@
   display: block;
   font-size: 13px;
   font-weight: 600;
+}
+.fieldHeading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 6px 12px;
   margin-bottom: 12px;
+}
+.characterCount {
+  font-size: 12px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
 }
 .form textarea {
   width: 100%;
@@ -77,6 +83,18 @@
   gap: 12px;
   margin-left: auto;
 }
+.actionInfo {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.quota {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
 .hint {
   font-size: 12px;
   color: var(--muted);
@@ -101,7 +119,10 @@
   background: #cce7a4;
 }
 .submit:disabled {
-  opacity: 0.65;
+  background: var(--border);
+  border-color: var(--border);
+  color: var(--muted);
+  cursor: not-allowed;
 }
 .examples {
   margin-top: 28px;
@@ -133,36 +154,42 @@
 .examples button:hover {
   background: var(--hover);
 }
-.note {
-  margin-top: 24px;
-  color: var(--muted);
-  font-size: 13px;
+.resume {
+  margin-top: 16px;
   text-align: center;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 16px;
 }
-.note button {
-  white-space: nowrap;
+.resume a {
+  display: inline-flex;
+  align-items: center;
   min-height: 44px;
-  background: transparent;
-  border: 0;
+  padding: 0 8px;
+  border-radius: 4px;
+  color: var(--muted);
   font-size: 13px;
   text-decoration: underline;
   text-underline-offset: 3px;
 }
+.resume a:hover {
+  color: var(--foreground);
+  background: var(--hover);
+}
 .compact {
   max-width: none;
-  padding: 32px 0 0;
+  padding: 20px 0 0;
 }
 .briefBar {
   display: flex;
   align-items: center;
   gap: 14px;
   border-left: 3px solid var(--border);
-  padding: 8px 0 8px 16px;
+  padding: 0 0 0 12px;
   background: transparent;
+}
+.briefActions {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 8px;
 }
 .briefBar > svg {
   flex-shrink: 0;
@@ -172,20 +199,19 @@
   min-width: 0;
   margin: 0;
 }
-.briefBar p > span:first-child {
-  display: block;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--muted);
-  margin-bottom: 4px;
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 .briefBar p > span:last-child {
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 3;
-  line-clamp: 3;
+  display: block;
   overflow: hidden;
-  overflow-wrap: anywhere;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-size: 14px;
   line-height: 1.6;
 }
@@ -199,13 +225,19 @@
   font-size: 13px;
   padding: 0 8px;
 }
+.briefBar button {
+  min-height: 32px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
 .briefBar button:hover,
 .cancel:hover {
   background: var(--hover);
 }
 .compact .heading {
   text-align: left;
-  margin-bottom: 18px;
+  margin-bottom: 8px;
 }
 .compact .heading h1 {
   font-size: 24px;
@@ -219,11 +251,6 @@
   min-height: 52px;
   font-size: 15px;
 }
-.compact .note {
-  margin: 4px 0 0;
-  justify-content: space-between;
-  text-align: left;
-}
 @media (min-width: 701px) and (max-height: 800px) {
   .section:not(.compact) {
     padding: 32px 0 20px;
@@ -236,9 +263,6 @@
   }
   .examples {
     margin-top: 20px;
-  }
-  .section:not(.compact) .note {
-    margin-top: 16px;
   }
 }
 @media (max-width: 700px) {
@@ -257,10 +281,6 @@
   .mobileBreak {
     display: block;
   }
-  .eyebrow {
-    font-size: 12px;
-    letter-spacing: 1.2px;
-  }
   .form {
     padding: 18px 18px 14px;
   }
@@ -268,6 +288,16 @@
     min-height: 146px;
   }
   .hint {
+    display: none;
+  }
+  .actions {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .actionInfo {
+    width: 100%;
+  }
+  .actionInfo:has(.hint:only-child) {
     display: none;
   }
   .actionButtons {
@@ -285,28 +315,29 @@
   .examples button {
     justify-content: space-between;
   }
-  .note {
-    font-size: 12px;
-  }
   .compact {
-    padding-top: 28px;
+    padding-top: 16px;
   }
   .compact textarea {
     min-height: 52px;
     font-size: 16px;
   }
-  .compact .note {
+  .briefBar {
     gap: 6px;
+  }
+  .briefBar button {
+    min-height: 44px;
+  }
+  .briefBar p > span:last-child {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    white-space: normal;
+    overflow-wrap: anywhere;
   }
 }
 @media (max-width: 480px) {
-  .briefBar {
-    flex-wrap: wrap;
-    gap: 4px;
-  }
-  .briefBar p {
-    flex-basis: 100%;
-  }
   .briefBar button {
     padding-left: 0;
     text-decoration: underline;

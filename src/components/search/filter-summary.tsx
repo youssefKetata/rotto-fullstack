@@ -1,10 +1,19 @@
-import type { SearchFilters } from "@/lib/search/schema";
+import { Tooltip } from "radix-ui";
+import {
+  searchAliases,
+  searchVocabulary,
+  type SearchFilters,
+} from "@/lib/search/schema";
 import { Icon } from "./icon";
 import styles from "./search-workspace.module.css";
 import { humanize } from "./requirement-editor-model";
 
 type Criteria = SearchFilters["anyOf"][number];
-type Chip = { label: string; remove: (criteria: Criteria) => void };
+type Chip = {
+  label: string;
+  remove: (criteria: Criteria) => void;
+  help?: string;
+};
 
 export function requirementLabel(issue: SearchFilters["issues"][number]) {
   return /japanese/i.test(issue.text) && issue.kind === "unsupported"
@@ -32,6 +41,12 @@ const title = (value: string) =>
   value === "mid"
     ? "Mid-level"
     : value.charAt(0).toUpperCase() + value.slice(1);
+const stateName = (value: string) => {
+  const name = Object.entries(searchAliases.states).find(
+    ([, code]) => code === value,
+  )?.[0];
+  return name ? name.split(" ").map(title).join(" ") : value;
+};
 
 function chips(criteria: Criteria): Chip[] {
   const result: Chip[] = [];
@@ -46,8 +61,8 @@ function chips(criteria: Criteria): Chip[] {
   ];
   for (const [key, label] of arrays) {
     const values = criteria[key] as string[] | undefined;
-    values?.forEach((value, index) =>
-      result.push({
+    const items =
+      values?.map((value, index): Chip => ({
         label: `${label}: ${key.toLowerCase().includes("senior") ? title(value) : value}`,
         remove(next) {
           const remaining = (next[key] as string[]).filter(
@@ -56,8 +71,26 @@ function chips(criteria: Criteria): Chip[] {
           if (remaining.length) Object.assign(next, { [key]: remaining });
           else delete next[key];
         },
-      }),
-    );
+      })) ?? [];
+    if (
+      items.length > 1 &&
+      ["roles", "seniorities", "skillsAll", "skillsAny"].includes(key)
+    ) {
+      const mode = key === "skillsAll" ? "all" : "any";
+      const label =
+        key === "roles"
+          ? `Role: Any of ${items.length} ${values!.every((value) => value.endsWith(" Engineer")) ? "engineering roles" : "roles"}`
+          : key === "seniorities"
+            ? `Level: ${values!.map(title).join(" or ")}`
+            : `Skills: ${items.length <= 3 ? values!.join(mode === "all" ? " + " : " or ") : `${mode === "all" ? "All" : "Any of"} ${items.length} skills`}`;
+      result.push({
+        label,
+        help: `${key === "roles" && values!.length === searchVocabulary.roles.filter((role) => role.endsWith(" Engineer")).length && values!.every((value) => value.endsWith(" Engineer")) ? `“Engineer” covers ${items.length} roles. A candidate needs only one: ` : `Match ${mode === "all" ? "all" : "any one"}: `}${values!.map(title).join(", ")}.`,
+        remove(next) {
+          delete next[key];
+        },
+      });
+    } else result.push(...items);
   }
   for (const key of ["minYears", "maxYears"] as const) {
     if (criteria[key] !== undefined)
@@ -78,7 +111,7 @@ function chips(criteria: Criteria): Chip[] {
   for (const key of ["locations", "excludeLocations"] as const) {
     criteria[key]?.forEach((location, index) =>
       result.push({
-        label: `${key === "excludeLocations" ? "Exclude Location" : "Location"}: ${[location.city, location.state, location.country ? humanize(location.country) : undefined].filter(Boolean).join(", ")}`,
+        label: `${key === "excludeLocations" ? "Exclude location" : "Location"}: ${[location.city, location.state ? (location.city ? location.state : stateName(location.state)) : undefined, location.country && (!location.state || location.country !== "US") ? humanize(location.country) : undefined].filter(Boolean).join(", ")}`,
         remove(next) {
           next[key] = next[key]?.filter((_, i) => i !== index);
           if (!next[key]?.length) delete next[key];
@@ -88,7 +121,7 @@ function chips(criteria: Criteria): Chip[] {
   }
   criteria.experience?.forEach((experience, index) =>
     result.push({
-      label: `${experience.exclude ? "Exclude work history" : "Worked at"}: ${[...(experience.companyTypes ?? []).map(humanize), ...(experience.companies ?? []), ...(experience.titles ?? []), humanize(experience.scope)].join(" · ")}`,
+      label: `${experience.exclude ? "Exclude work history" : "Worked at"}: ${[...(experience.companyTypes ?? []).map(humanize), ...(experience.companies ?? []), ...(experience.titles ?? []), experience.scope !== "any" ? humanize(experience.scope) : ""].filter(Boolean).join(" · ") || "Any company"}`,
       remove(next) {
         next.experience = next.experience?.filter((_, i) => i !== index);
         if (!next.experience?.length) delete next.experience;
@@ -133,6 +166,88 @@ export function FilterSummary({
   onEdit: () => void;
   onRemoveRequirement: (index: number) => void;
 }) {
+  function renderChip(
+    chip: Chip,
+    index: number,
+    preferred: boolean,
+    key: string,
+  ) {
+    return (
+      <div className={styles.chip} data-preferred={preferred} key={key}>
+        <Tooltip.Root>
+          <Tooltip.Trigger asChild>
+            <button
+              type="button"
+              disabled={disabled}
+              onClick={onEdit}
+              aria-label={`Edit ${chip.label}`}
+            >
+              {chip.label}
+            </button>
+          </Tooltip.Trigger>
+          {chip.help && (
+            <Tooltip.Portal>
+              <Tooltip.Content
+                className={styles.chipHelp}
+                side="top"
+                sideOffset={6}
+                collisionPadding={16}
+              >
+                {chip.help}
+              </Tooltip.Content>
+            </Tooltip.Portal>
+          )}
+        </Tooltip.Root>
+        <button
+          type="button"
+          disabled={disabled}
+          aria-label={`Remove ${chip.label}`}
+          onClick={(event) => {
+            const chipElement = event.currentTarget.parentElement;
+            const chipGroup = chipElement?.parentElement;
+            const nextLabel = (
+              chipElement?.nextElementSibling ??
+              chipElement?.previousElementSibling
+            )
+              ?.querySelector("button")
+              ?.getAttribute("aria-label");
+            const next = structuredClone(filters);
+            chip.remove((preferred ? next.preferred : next.anyOf)[index]);
+            if (preferred)
+              next.preferred = next.preferred.filter(
+                (item) => Object.keys(item).length > 0,
+              );
+            else
+              next.anyOf = next.anyOf.filter(
+                (item) => Object.keys(item).length > 0,
+              );
+            onChange(next);
+            requestAnimationFrame(() => {
+              const nextButton =
+                chipGroup?.isConnected && nextLabel
+                  ? [
+                      ...chipGroup.querySelectorAll<HTMLButtonElement>(
+                        "button",
+                      ),
+                    ].find(
+                      (button) =>
+                        button.getAttribute("aria-label") === nextLabel,
+                    )
+                  : undefined;
+              (
+                nextButton ??
+                document.querySelector<HTMLButtonElement>(
+                  "[data-edit-requirements]",
+                )
+              )?.focus();
+            });
+          }}
+        >
+          <Icon name="close" size={13} />
+        </button>
+      </div>
+    );
+  }
   function group(criteria: Criteria, index: number, preferred = false) {
     const values = chips(criteria);
     return (
@@ -143,52 +258,25 @@ export function FilterSummary({
         aria-labelledby={`requirement-group-${preferred}-${index}`}
       >
         <span
-          className={styles.groupLabel}
+          className={
+            !preferred &&
+            filters.anyOf.length === 1 &&
+            !filters.preferred.length
+              ? styles.srOnly
+              : styles.groupLabel
+          }
           id={`requirement-group-${preferred}-${index}`}
         >
           {preferred
             ? `Nice to have${filters.preferred.length > 1 ? ` ${index + 1}` : ""}`
             : filters.anyOf.length > 1
               ? `${index ? "Or " : ""}Accepted set ${index + 1}`
-              : "Must match"}
+              : "Required"}
         </span>
         <div className={styles.chips}>
-          {values.map((chip, chipIndex) => (
-            <div
-              className={styles.chip}
-              data-preferred={preferred}
-              key={`${chip.label}:${chipIndex}`}
-            >
-              <button
-                type="button"
-                disabled={disabled}
-                onClick={onEdit}
-                aria-label={`Edit ${chip.label}`}
-              >
-                {chip.label}
-              </button>
-              <button
-                type="button"
-                disabled={disabled}
-                aria-label={`Remove ${chip.label}`}
-                onClick={() => {
-                  const next = structuredClone(filters);
-                  chip.remove((preferred ? next.preferred : next.anyOf)[index]);
-                  if (preferred)
-                    next.preferred = next.preferred.filter(
-                      (item) => Object.keys(item).length > 0,
-                    );
-                  else
-                    next.anyOf = next.anyOf.filter(
-                      (item) => Object.keys(item).length > 0,
-                    );
-                  onChange(next);
-                }}
-              >
-                <Icon name="close" size={13} />
-              </button>
-            </div>
-          ))}
+          {values.map((chip, chipIndex) =>
+            renderChip(chip, index, preferred, `${chip.label}:${chipIndex}`),
+          )}
           {!values.length && (
             <span className={styles.trust}>No supported requirements.</span>
           )}
@@ -197,7 +285,7 @@ export function FilterSummary({
     );
   }
   return (
-    <>
+    <Tooltip.Provider delayDuration={200}>
       {filters.anyOf.map((criteria, index) => group(criteria, index))}
       {filters.preferred.map((criteria, index) => group(criteria, index, true))}
       {filters.issues.map((issue, index) => (
@@ -216,6 +304,6 @@ export function FilterSummary({
           </button>
         </div>
       ))}
-    </>
+    </Tooltip.Provider>
   );
 }

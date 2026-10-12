@@ -14,11 +14,15 @@ import {
   updateWorkspaceUrl,
   type WorkspaceIdentity,
 } from "../workspace-state";
+import { readWorkspaceSession, workspaceEntry } from "../workspace-session";
 
 type Setter<T> = Dispatch<SetStateAction<T>>;
 type Options = WorkspaceIdentity & {
   brief: string;
   search: SearchResponse | null;
+  previousSearchId: string | null;
+  setPreviousSearchId: Setter<string | null>;
+  clearSearch: () => void;
   setBrief: Setter<string>;
   setPlan: Setter<CompanyPlan | null>;
   setLists: Setter<Shortlist[]>;
@@ -36,6 +40,9 @@ export function useWorkspaceSession({
   recruiterId,
   brief,
   search,
+  previousSearchId,
+  setPreviousSearchId,
+  clearSearch,
   setBrief,
   setPlan,
   setLists,
@@ -56,23 +63,28 @@ export function useWorkspaceSession({
     const key = storageKey;
     const controller = new AbortController();
     let active = true;
-    async function restore() {
-      let lastId: string | null = null;
-      let draft = "";
+    function entry() {
+      let raw = null;
       try {
-        const saved = JSON.parse(sessionStorage.getItem(key) ?? "null") as {
-          draft?: string;
-          lastSearchId?: string;
-        } | null;
-        draft =
-          typeof saved?.draft === "string" ? saved.draft.slice(0, 4000) : "";
-        lastId =
-          typeof saved?.lastSearchId === "string" ? saved.lastSearchId : null;
+        raw = sessionStorage.getItem(key);
       } catch {
         /* Storage is optional; the database remains authoritative. */
       }
+      const saved = readWorkspaceSession(raw);
       const url = new URL(window.location.href);
-      const id = url.searchParams.get("search") ?? lastId;
+      return {
+        url,
+        saved,
+        ...workspaceEntry(
+          url,
+          saved,
+          window.history.state?.rottoWorkspace,
+          key,
+        ),
+      };
+    }
+    async function restore() {
+      const { url, saved, searchId: id, draft } = entry();
       const jobs = await Promise.allSettled([
         searchApi<CompanyPlan>("/api/plan", { signal: controller.signal }),
         searchApi<Shortlist[]>("/api/shortlists", {
@@ -103,9 +115,18 @@ export function useWorkspaceSession({
         });
       }
       if (jobs[2].status === "fulfilled") setSavedBriefs(jobs[2].value);
-      if (jobs[3].status === "fulfilled" && jobs[3].value)
+      setPreviousSearchId(saved.lastSearchId);
+      if (jobs[3].status === "fulfilled" && jobs[3].value) {
         accept(jobs[3].value);
-      else setBrief(draft);
+        if (draft !== undefined) setBrief(draft);
+      } else {
+        clearSearch();
+        setBrief(draft ?? "");
+      }
+      // Consume the sign-in marker so refreshing can restore a new draft.
+      const currentUrl = new URL(window.location.href);
+      currentUrl.searchParams.delete("new");
+      window.history.replaceState(window.history.state, "", currentUrl);
       const failure = jobs.find((job) => job.status === "rejected");
       if (failure?.status === "rejected") setError(message(failure.reason));
       setReady(true);
@@ -126,15 +147,20 @@ export function useWorkspaceSession({
       }
     }
     async function fromHistory() {
-      const url = new URL(window.location.href);
-      const id = url.searchParams.get("search");
+      const { url, searchId: id, draft } = entry();
       try {
         if (id) {
           const result = await searchApi<SearchResponse>(
             `/api/search/${encodeURIComponent(id)}?page=1`,
             { signal: controller.signal },
           );
-          if (active) accept(result);
+          if (active) {
+            accept(result);
+            if (draft !== undefined) setBrief(draft);
+          }
+        } else if (active) {
+          clearSearch();
+          setBrief(draft ?? "");
         }
         const personId = url.searchParams.get("candidate");
         if (personId) {
@@ -170,22 +196,34 @@ export function useWorkspaceSession({
     setBrief,
     setCandidate,
     setError,
+    setPreviousSearchId,
+    clearSearch,
   ]);
 
   useEffect(() => {
     if (!storageKey || !ready) return;
+    const searchId = search?.search_id ?? null;
+    // Each history entry retains its own draft, including the new-search page.
+    window.history.replaceState(
+      {
+        ...window.history.state,
+        rottoWorkspace: { identity: storageKey, searchId, draft: brief },
+      },
+      "",
+    );
     try {
       sessionStorage.setItem(
         storageKey,
         JSON.stringify({
           draft: brief,
-          lastSearchId: search?.search_id ?? null,
+          activeSearchId: searchId,
+          lastSearchId: previousSearchId,
         }),
       );
     } catch {
       /* A draft may be lost; results and lists are saved on the server. */
     }
-  }, [storageKey, ready, brief, search?.search_id]);
+  }, [storageKey, ready, brief, search?.search_id, previousSearchId]);
 
   return ready;
 }

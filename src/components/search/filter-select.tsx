@@ -18,17 +18,19 @@ export function FilterSelect({
 }: {
   label: string;
   value?: string;
-  anyLabel: string;
+  anyLabel?: string;
   options: { value: string; label: string }[];
   onChange: (value: string) => void;
   className?: string;
 }) {
   const id = useId();
   return (
-    <div className={className}>
-      <label htmlFor={id}>{label}</label>
+    <div className={`${styles.selectField} ${className ?? ""}`}>
+      <label className={styles.selectLabel} htmlFor={id}>
+        {label}
+      </label>
       <Select
-        value={value || "__any__"}
+        value={value || (anyLabel ? "__any__" : undefined)}
         onValueChange={(selected) =>
           onChange(selected === "__any__" ? "" : selected)
         }
@@ -37,7 +39,7 @@ export function FilterSelect({
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="__any__">{anyLabel}</SelectItem>
+          {anyLabel && <SelectItem value="__any__">{anyLabel}</SelectItem>}
           {options.map((option) => (
             <SelectItem key={option.value} value={option.value}>
               {option.label}

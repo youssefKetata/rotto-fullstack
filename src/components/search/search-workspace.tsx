@@ -8,6 +8,7 @@ import {
   DropdownMenuTrigger,
   DropdownMenuContent,
   DropdownMenuLabel,
+  DropdownMenuItem,
 } from "@/components/ui/dropdown-menu";
 import { BriefForm } from "./brief-form";
 import { CandidateRow } from "./candidate-row";
@@ -22,6 +23,7 @@ import { WorkspaceOverlays } from "./workspace-overlays";
 import { useSearchWorkspace } from "./hooks/use-search-workspace";
 import type { WorkspaceIdentity } from "./workspace-state";
 import { Icon } from "./icon";
+import { PendingLabel } from "./workspace-dialog";
 import styles from "./search-workspace.module.css";
 
 export function SearchWorkspace({
@@ -31,16 +33,17 @@ export function SearchWorkspace({
 }: WorkspaceIdentity & { company?: string }) {
   const workspace = useSearchWorkspace({ companyId, recruiterId });
   const {
-    brief,
+    brief: currentBrief,
     setBrief,
-    search,
-    filters,
+    search: completedSearch,
+    filters: currentFilters,
     setFilters,
     plan,
     view,
     setView,
     lists,
     listPeople,
+    listMemberships,
     activeList,
     savedBriefs,
     candidate,
@@ -49,12 +52,15 @@ export function SearchWorkspace({
     setEditFilters,
     setUpgrade,
     pending,
+    rerunning,
     paging,
     collectionPending,
+    pickerPending,
     saving,
     searchSaved,
     planPending,
     ready,
+    previousSearchId,
     error,
     setError,
     setDialogError,
@@ -78,9 +84,11 @@ export function SearchWorkspace({
     openPicker,
     membership,
     saveSearch,
-    startOver,
     showLists,
   } = workspace;
+  const brief = rerunning?.brief ?? currentBrief;
+  const search = rerunning ? null : completedSearch;
+  const filters = rerunning?.filters ?? currentFilters;
   const [omitted, setOmitted] = useState<{
     brief: string;
     issues: SearchFilters["issues"];
@@ -152,7 +160,9 @@ export function SearchWorkspace({
             data-active={view === "saved"}
             aria-pressed={view === "saved"}
             aria-label={`Saved searches, ${savedBriefs.length}`}
-            onClick={() => setView(view === "saved" ? "search" : "saved")}
+            onClick={() =>
+              view === "saved" ? setView("search") : void workspace.showSaved()
+            }
             disabled={!ready}
           >
             <Icon name="history" size={18} />
@@ -175,7 +185,7 @@ export function SearchWorkspace({
             <span className={styles.badge}>{lists.length}</span>
           </button>
           {company ? (
-            <DropdownMenu>
+            <DropdownMenu modal={false}>
               <DropdownMenuTrigger asChild>
                 <button
                   type="button"
@@ -213,19 +223,16 @@ export function SearchWorkspace({
                 : undefined
             }
             pending={pending}
-            compact={!!search}
-            submitted={search?.brief}
-            onReset={() => {
-              setOmitted({ brief: "", issues: [] });
-              startOver();
-            }}
-            planNote={
-              exhausted
-                ? "Review your requirements before your next search."
-                : planNote
-            }
+            compact={!!search || !!rerunning}
+            submitted={rerunning?.brief ?? search?.brief}
+            planNote={plan?.plan === "paid" || exhausted ? undefined : planNote}
             exhausted={exhausted}
             onUpgrade={() => setUpgrade(true)}
+            previousSearchHref={
+              ready && previousSearchId
+                ? `/?search=${encodeURIComponent(previousSearchId)}`
+                : undefined
+            }
           />
         )}
         {view === "search" && search && filters && (
@@ -239,6 +246,7 @@ export function SearchWorkspace({
                 <button
                   type="button"
                   className={styles.edit}
+                  data-edit-requirements
                   disabled={pending}
                   onClick={() => setEditFilters(true)}
                 >
@@ -263,13 +271,14 @@ export function SearchWorkspace({
               onEdit={() => setEditFilters(true)}
               onRemoveRequirement={continueWithoutRequirement}
             />
-            <p className={styles.trust}>
-              {filters.anyOf.length > 1
-                ? "Candidates must match every requirement in any one accepted set."
-                : "Candidates must match every requirement."}
-              {filters.preferred.length > 0 &&
-                " Nice-to-have requirements change the order only."}
-            </p>
+            {(filters.anyOf.length > 1 || filters.preferred.length > 0) && (
+              <p className={styles.trust}>
+                {filters.anyOf.length > 1 &&
+                  "Match all requirements in any one accepted set. "}
+                {filters.preferred.length > 0 &&
+                  "Nice-to-have requirements affect ranking only."}
+              </p>
+            )}
             {adjusted && (
               <div className={styles.adjusted}>
                 <span>
@@ -297,7 +306,7 @@ export function SearchWorkspace({
                     }
                   >
                     {exhausted
-                      ? "Upgrade to apply"
+                      ? "View plan"
                       : pending
                         ? "Applying…"
                         : "Apply changes"}
@@ -320,18 +329,18 @@ export function SearchWorkspace({
               <div>
                 <h1>
                   {view === "saved"
-                    ? "Saved searches."
-                    : "Your team’s shortlists."}
+                    ? "Saved searches"
+                    : "Your team’s shortlists"}
                 </h1>
                 <p>
                   {view === "saved"
-                    ? "Keep a brief and its exact requirements. Rerunning counts as a new search."
+                    ? "View previous results for free. Each rerun counts as a new search."
                     : `People worth a closer look, saved for ${company}.`}
                 </p>
               </div>
               {view === "shortlists" && (
                 <button
-                  className={styles.primaryButton}
+                  className={styles.outlineButton}
                   type="button"
                   onClick={() => {
                     setDialogError("");
@@ -371,37 +380,130 @@ export function SearchWorkspace({
           </div>
         )}
         {view === "saved" && (
-          <section aria-label="Saved searches">
+          <section aria-label="Saved searches" aria-busy={pending}>
             {savedBriefs.length > 0 && (
               <ul className={styles.savedList}>
                 {savedBriefs.map((saved) => (
                   <li key={saved.id}>
                     <div>
-                      <h2>{saved.brief}</h2>
-                      <p>
-                        {saved.filters.anyOf.length}{" "}
-                        {saved.filters.anyOf.length === 1
-                          ? "accepted set"
-                          : "accepted sets"}
-                        {saved.filters.issues.length
-                          ? ` · ${saved.filters.issues.length} requirements to review`
-                          : ""}
-                      </p>
+                      <h2>{saved.name || saved.brief}</h2>
+                      {saved.name && (
+                        <p className={styles.savedBrief}>{saved.brief}</p>
+                      )}
+                      <div className={styles.savedMeta}>
+                        {saved.last_result_count !== null &&
+                          saved.last_result_count !== undefined && (
+                            <span>
+                              {saved.last_result_count.toLocaleString()}{" "}
+                              {saved.last_result_count === 1
+                                ? "candidate"
+                                : "candidates"}
+                            </span>
+                          )}
+                        {(saved.last_searched_at || saved.created_at) && (
+                          <span>
+                            {saved.last_searched_at ? "Last run " : "Saved "}
+                            <time
+                              dateTime={
+                                saved.last_searched_at || saved.created_at
+                              }
+                            >
+                              {new Date(
+                                (saved.last_searched_at || saved.created_at)!,
+                              ).toLocaleString("en-US", {
+                                month: "short",
+                                day: "numeric",
+                                hour: "numeric",
+                                minute: "2-digit",
+                              })}
+                            </time>
+                          </span>
+                        )}
+                        {saved.filters.anyOf.length > 1 && (
+                          <span>
+                            Matches any of {saved.filters.anyOf.length}{" "}
+                            requirement groups
+                          </span>
+                        )}
+                        {saved.filters.issues.length > 0 && (
+                          <span>
+                            {saved.filters.issues.length}{" "}
+                            {saved.filters.issues.length === 1
+                              ? "requirement"
+                              : "requirements"}{" "}
+                            to review
+                          </span>
+                        )}
+                      </div>
                     </div>
-                    <button
-                      className={styles.primaryButton}
-                      type="button"
-                      disabled={pending}
-                      onClick={() =>
-                        startOperation(
-                          `/api/saved-briefs/${encodeURIComponent(saved.id)}/rerun`,
-                          {},
-                        )
-                      }
-                    >
-                      {exhausted ? "Upgrade to rerun" : "Rerun search"}
-                      <Icon name="arrow" size={16} />
-                    </button>
+                    <div className={styles.savedActions}>
+                      {saved.last_search_id && (
+                        <a
+                          className={styles.viewResults}
+                          href={`/?search=${encodeURIComponent(saved.last_search_id)}`}
+                        >
+                          View results
+                        </a>
+                      )}
+                      <button
+                        className={styles.rerunButton}
+                        type="button"
+                        disabled={pending}
+                        aria-busy={rerunning?.id === saved.id}
+                        onClick={() =>
+                          startOperation(
+                            `/api/saved-briefs/${encodeURIComponent(saved.id)}/rerun`,
+                            {},
+                          )
+                        }
+                      >
+                        <PendingLabel
+                          pending={rerunning?.id === saved.id}
+                          idle={exhausted ? "Paid plan" : "Rerun"}
+                          loading="Searching…"
+                        />
+                        <span className={styles.rerunIcon} aria-hidden="true">
+                          {rerunning?.id === saved.id ? (
+                            <span
+                              className={styles.spinner}
+                              aria-hidden="true"
+                            />
+                          ) : exhausted ? (
+                            <Icon name="lock" size={14} />
+                          ) : null}
+                        </span>
+                      </button>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <button
+                            className={styles.savedOverflow}
+                            type="button"
+                            aria-label={`Manage saved search: ${saved.name || saved.brief}`}
+                            disabled={pending || workspace.savedPending}
+                          >
+                            <Icon name="more" size={18} />
+                          </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem
+                            onSelect={() => {
+                              workspace.setSavedError("");
+                              workspace.setSavedName(saved);
+                            }}
+                          >
+                            Rename
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onSelect={() => {
+                              workspace.setSavedError("");
+                              workspace.setSavedRemoval(saved);
+                            }}
+                          >
+                            Remove saved search
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
                   </li>
                 ))}
               </ul>
@@ -422,26 +524,30 @@ export function SearchWorkspace({
         )}
         {view === "shortlists" && (
           <div className={styles.listToolbar}>
-            <div
-              className={styles.listTabs}
-              role="group"
-              aria-label="Choose shortlist"
-            >
-              {lists.map((list) => (
-                <button
-                  key={list.id}
-                  type="button"
-                  data-active={activeList === list.id}
-                  disabled={collectionPending}
-                  onClick={() => void selectList(list.id)}
-                >
-                  {list.name}
-                  {listPeople[list.id] && (
-                    <span>{listPeople[list.id].length}</span>
-                  )}
-                </button>
-              ))}
-            </div>
+            {lists.length === 1 ? (
+              <h2 className={styles.singleListHeading}>{lists[0].name}</h2>
+            ) : (
+              <div
+                className={styles.listTabs}
+                role="group"
+                aria-label="Choose shortlist"
+              >
+                {lists.map((list) => (
+                  <button
+                    key={list.id}
+                    type="button"
+                    data-active={activeList === list.id}
+                    disabled={collectionPending}
+                    onClick={() => void selectList(list.id)}
+                  >
+                    {list.name}
+                    {listPeople[list.id] && (
+                      <span>{listPeople[list.id].length}</span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
             {currentList && (
               <div className={styles.inlineActions}>
                 <button
@@ -455,7 +561,7 @@ export function SearchWorkspace({
                   Rename
                 </button>
                 <button
-                  className={styles.edit}
+                  className={styles.deleteList}
                   type="button"
                   onClick={() => {
                     setDialogError("");
@@ -529,8 +635,26 @@ export function SearchWorkspace({
                         key={person.id}
                         candidate={person}
                         matched={view === "shortlists" ? [] : matched}
+                        workRequirements={
+                          view === "search"
+                            ? [
+                                ...(search?.filters.anyOf ?? []),
+                                ...(search?.filters.preferred ?? []),
+                              ].flatMap((criteria) => criteria.experience ?? [])
+                            : undefined
+                        }
                         selected={candidate?.id === person.id}
                         saved={savedIds.has(person.id)}
+                        remove={view === "shortlists"}
+                        membershipPending={pickerPending}
+                        membership={
+                          view === "shortlists"
+                            ? listMemberships[activeList ?? ""]?.find(
+                                (entry) => entry.candidate_id === person.id,
+                              )
+                            : undefined
+                        }
+                        recruiterId={recruiterId}
                         onOpen={(person) => void openPerson(person)}
                         onToggle={(person) =>
                           view === "shortlists" && currentList
@@ -552,7 +676,7 @@ export function SearchWorkspace({
                     <h3>
                       {view === "shortlists"
                         ? lists.length
-                          ? "Keep the people who stand out."
+                          ? `No candidates in “${currentList?.name ?? "this list"}”`
                           : "Start with a named list."
                         : "No candidates match every requirement"}
                     </h3>
@@ -613,28 +737,31 @@ export function SearchWorkspace({
                     )}
                   </div>
                 )}
-                {view === "search" && search && !!search.results.length && (
-                  <div className={styles.pagination}>
-                    <span>
-                      {search.results.length} of {search.total.toLocaleString()}{" "}
-                      shown
-                    </span>
-                    {search.results.length < search.total && (
-                      <button
-                        type="button"
-                        disabled={paging || pending}
-                        onClick={() => void more()}
-                      >
-                        {paging
-                          ? "Loading more…"
-                          : pageError
-                            ? "Retry next page"
-                            : "Show more"}
-                        <Icon name="arrow" size={16} />
-                      </button>
-                    )}
-                  </div>
-                )}
+                {view === "search" &&
+                  search &&
+                  search.total > 20 &&
+                  !!search.results.length && (
+                    <div className={styles.pagination}>
+                      <span>
+                        {search.results.length} of{" "}
+                        {search.total.toLocaleString()} shown
+                      </span>
+                      {search.results.length < search.total && (
+                        <button
+                          type="button"
+                          disabled={paging || pending}
+                          onClick={() => void more()}
+                        >
+                          {paging
+                            ? "Loading more…"
+                            : pageError
+                              ? "Retry next page"
+                              : "Show more"}
+                          <Icon name="arrow" size={16} />
+                        </button>
+                      )}
+                    </div>
+                  )}
                 {pageError && view === "search" && (
                   <p className={styles.dialogError} role="alert">
                     {pageError} Your loaded results are still here.
@@ -644,7 +771,7 @@ export function SearchWorkspace({
             )}
           </section>
         )}
-        {exhausted && view === "search" && !pending && (
+        {exhausted && search && view === "search" && !pending && (
           <div className={styles.planBanner}>
             <span>
               {company
@@ -652,7 +779,7 @@ export function SearchWorkspace({
                 : "Your company's free search is used."}
             </span>
             <button type="button" onClick={() => setUpgrade(true)}>
-              Upgrade
+              Plan
             </button>
           </div>
         )}

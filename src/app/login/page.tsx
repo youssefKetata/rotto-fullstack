@@ -10,10 +10,6 @@ export default function Login() {
       <section className={styles["login-story"]} aria-label="About Rotto">
         <Brand />
         <div className={styles["story-copy"]}>
-          <span className={styles["story-label"]}>
-            <span />
-            THE PEOPLE BEHIND WHAT’S NEXT
-          </span>
           <h2>
             Great teams
             <br />
@@ -21,14 +17,6 @@ export default function Login() {
             <br />
             <em>the right people.</em>
           </h2>
-          <p>
-            A little less searching.
-            <br />A lot more possibility.
-          </p>
-        </div>
-        <div className={styles["story-footer"]}>
-          <span>Made for people who hire.</span>
-          <span aria-hidden="true">↗</span>
         </div>
         <div
           className={styles["story-orbit"] + " " + styles["orbit-one"]}
@@ -45,20 +33,11 @@ export default function Login() {
         </div>
         <div className={styles["login-content"]}>
           <div className={styles["form-heading"]}>
-            <span className={styles["eyebrow"]}>
-              YOUR NEXT GREAT HIRE STARTS HERE
-            </span>
-            <h1>Welcome back.</h1>
-            <p>Sign in to your recruiter workspace.</p>
+            <h1>Sign in</h1>
+            <p>Use your company’s recruiter account.</p>
           </div>
           <LoginForm />
-          <p className={styles["login-note"]}>
-            Use the recruiter account provided by your company.
-          </p>
         </div>
-        <span className={styles["panel-footer"]}>
-          A thoughtful way to find talent.
-        </span>
       </section>
     </main>
   );

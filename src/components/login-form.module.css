@@ -7,7 +7,7 @@
 .field label {
   display: block;
   margin-bottom: 9px;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
 }
 .field input {
@@ -18,7 +18,7 @@
   color: var(--foreground);
   border: 1px solid var(--control-border);
   border-radius: 8px;
-  background: #fff;
+  background: var(--surface);
   font-size: 13px;
   transition:
     border-color 150ms,
@@ -35,6 +35,12 @@
 .field input:disabled {
   opacity: 0.7;
 }
+.field input:-webkit-autofill,
+.field input:autofill {
+  -webkit-text-fill-color: var(--foreground);
+  caret-color: var(--foreground);
+  box-shadow: inset 0 0 0 1000px var(--surface);
+}
 .password-field {
   position: relative;
 }
@@ -48,7 +54,7 @@
   border: 0;
   background: transparent;
   color: var(--muted);
-  font-size: 11px;
+  font-size: 13px;
   border-radius: 5px;
 }
 .primary-button {
@@ -58,16 +64,16 @@
   gap: 10px;
   width: 100%;
   min-height: 50px;
-  border: 0;
-  border-radius: 8px;
-  background: #294c3c;
-  color: #f7f8ef;
+  border: 1px solid color-mix(in srgb, var(--foreground) 15%, transparent);
+  border-radius: 6px;
+  background: var(--accent);
+  color: var(--foreground);
   font-size: 13px;
-  font-weight: 550;
+  font-weight: 600;
   transition: background 150ms;
 }
-.primary-button:hover {
-  background: #1d3b2d;
+.primary-button:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--accent) 90%, var(--foreground));
 }
 .primary-button:disabled {
   opacity: 0.7;
@@ -92,8 +98,7 @@
   box-shadow: none;
 }
 .sign-in-button:disabled {
-  opacity: 1;
-  background: #345744;
+  opacity: 0.7;
 }
 .sign-in-label,
 .sign-in-icon {

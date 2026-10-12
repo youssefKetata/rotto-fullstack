@@ -1,6 +1,7 @@
 export function Icon({
   name,
   size = 20,
+  filled = false,
 }: {
   name:
     | "search"
@@ -11,10 +12,26 @@ export function Icon({
     | "check"
     | "close"
     | "filter"
+    | "lock"
+    | "more"
     | "chevron";
   size?: number;
+  filled?: boolean;
 }) {
   const paths = {
+    lock: (
+      <>
+        <rect x="5" y="10" width="14" height="11" rx="2" />
+        <path d="M8 10V7a4 4 0 0 1 8 0v3" />
+      </>
+    ),
+    more: (
+      <>
+        <circle cx="5" cy="12" r="1" />
+        <circle cx="12" cy="12" r="1" />
+        <circle cx="19" cy="12" r="1" />
+      </>
+    ),
     search: (
       <>
         <circle cx="10.5" cy="10.5" r="6.5" />
@@ -51,7 +68,7 @@ export function Icon({
       width={size}
       height={size}
       viewBox="0 0 24 24"
-      fill="none"
+      fill={filled ? "currentColor" : "none"}
       stroke="currentColor"
       strokeWidth="1.6"
       strokeLinecap="round"

@@ -1,8 +1,20 @@
 "use client";
 
-import { useRef, useEffect, useState, type FormEvent } from "react";
+import {
+  useRef,
+  useEffect,
+  useState,
+  useSyncExternalStore,
+  type FormEvent,
+} from "react";
+import { SEARCH_LIMITS } from "@/lib/search/schema";
 import { Icon } from "./icon";
 import styles from "./brief-form.module.css";
+
+const subscribeToPlatform = () => () => {};
+const platformShortcut = () =>
+  navigator.platform.startsWith("Mac") ? "⌘" : "Ctrl";
+const serverShortcut = () => "Ctrl";
 
 const examples = [
   {
@@ -29,10 +41,10 @@ type Props = {
   pending?: boolean;
   compact?: boolean;
   submitted?: string;
-  onReset?: () => void;
   planNote?: string;
   exhausted?: boolean;
   onUpgrade?: () => void;
+  previousSearchHref?: string;
 };
 
 export function BriefForm({
@@ -42,13 +54,19 @@ export function BriefForm({
   pending,
   compact,
   submitted,
-  onReset,
   planNote,
   exhausted,
   onUpgrade,
+  previousSearchHref,
 }: Props) {
   const input = useRef<HTMLTextAreaElement>(null);
+  const editButton = useRef<HTMLButtonElement>(null);
   const [editing, setEditing] = useState(false);
+  const shortcutKey = useSyncExternalStore(
+    subscribeToPlatform,
+    platformShortcut,
+    serverShortcut,
+  );
   useEffect(() => {
     function shortcut(event: KeyboardEvent) {
       const target = event.target as HTMLElement;
@@ -71,7 +89,7 @@ export function BriefForm({
   }, []);
   function submit(event: FormEvent) {
     event.preventDefault();
-    if (!pending && brief.trim()) {
+    if (!pending && (exhausted || brief.trim())) {
       if (exhausted) onUpgrade?.();
       else onSubmit?.();
       setEditing(false);
@@ -80,11 +98,6 @@ export function BriefForm({
   return (
     <section className={`${styles.section} ${compact ? styles.compact : ""}`}>
       <div className={styles.heading}>
-        {!compact && (
-          <span className={styles.eyebrow}>
-            A THOUGHTFUL WAY TO FIND TALENT
-          </span>
-        )}
         <h1>
           {compact ? (
             "Your candidate search"
@@ -95,40 +108,44 @@ export function BriefForm({
             </>
           )}
         </h1>
-        {!compact && (
-          <p>
-            The skills, the experience, the person you have in mind.
-            <br />
-            Start with a brief. Make it your own.
-          </p>
-        )}
+        {!compact && <p>Describe the skills and experience you need.</p>}
       </div>
       {compact && !editing ? (
         <div className={styles.briefBar}>
           <p>
-            <span>Candidate brief</span>
-            <span>{submitted}</span>
+            <span className={styles.srOnly}>Candidate brief</span>
+            <span title={submitted}>{submitted}</span>
           </p>
-          <button
-            type="button"
-            disabled={pending}
-            onClick={() => {
-              setEditing(true);
-              requestAnimationFrame(() => input.current?.focus());
-            }}
-          >
-            Edit brief
-          </button>
+          <div className={styles.briefActions}>
+            <button
+              ref={editButton}
+              type="button"
+              disabled={pending}
+              onClick={() => {
+                setEditing(true);
+                requestAnimationFrame(() => input.current?.focus());
+              }}
+            >
+              Edit brief
+            </button>
+          </div>
         </div>
       ) : (
         <form className={styles.form} onSubmit={submit} aria-busy={pending}>
-          <label htmlFor="candidate-brief">Candidate brief</label>
+          <div className={styles.fieldHeading}>
+            <label htmlFor="candidate-brief">Candidate brief</label>
+            <span id="candidate-brief-count" className={styles.characterCount}>
+              {brief.length.toLocaleString("en-US")}/
+              {SEARCH_LIMITS.maxBriefLength.toLocaleString("en-US")} characters
+            </span>
+          </div>
           <textarea
             ref={input}
             id="candidate-brief"
             value={brief}
             onChange={(e) => onChange?.(e.target.value)}
-            maxLength={4000}
+            maxLength={SEARCH_LIMITS.maxBriefLength}
+            aria-describedby="candidate-brief-count"
             rows={compact ? 2 : 4}
             readOnly={pending || !onChange}
             placeholder="Senior backend engineer, 6+ years, Go and PostgreSQL, based in Austin, open to work…"
@@ -140,15 +157,17 @@ export function BriefForm({
             }}
           />
           <div className={styles.actions}>
-            <span className={styles.hint}>
-              {brief.length >= 3200 ? (
-                `${brief.length}/4,000 characters`
+            <div className={styles.actionInfo}>
+              {exhausted ? (
+                <p className={styles.quota}>Free search used</p>
               ) : (
-                <>
-                  <kbd>Ctrl / ⌘</kbd> + <kbd>Enter</kbd> to search
-                </>
+                !compact &&
+                planNote && <p className={styles.quota}>{planNote}</p>
               )}
-            </span>
+              <span className={styles.hint}>
+                <kbd>{shortcutKey}</kbd> + <kbd>Enter</kbd> to search
+              </span>
+            </div>
             <div className={styles.actionButtons}>
               {compact && (
                 <button
@@ -158,6 +177,7 @@ export function BriefForm({
                   onClick={() => {
                     onChange?.(submitted ?? "");
                     setEditing(false);
+                    requestAnimationFrame(() => editButton.current?.focus());
                   }}
                 >
                   Cancel
@@ -167,15 +187,17 @@ export function BriefForm({
                 <button
                   className={styles.submit}
                   type="submit"
-                  disabled={pending || !brief.trim() || !onSubmit}
+                  disabled={
+                    pending || (!exhausted && !brief.trim()) || !onSubmit
+                  }
                 >
                   <span>
                     {pending
                       ? "Finding candidates…"
                       : exhausted
-                        ? "Upgrade to search"
+                        ? "View plan"
                         : compact
-                          ? "New search"
+                          ? "Search again"
                           : "Find candidates"}
                   </span>
                   <Icon name="arrow" size={18} />
@@ -200,22 +222,16 @@ export function BriefForm({
                 }}
               >
                 {example.label}
-                <Icon name="arrow" size={15} />
               </button>
             ))}
           </div>
         </div>
       )}
-      <div className={styles.note}>
-        <span>
-          {planNote ?? "Describe your brief. Review the requirements."}
-        </span>
-        {compact && (
-          <button type="button" disabled={pending} onClick={onReset}>
-            Start over
-          </button>
-        )}
-      </div>
+      {!compact && previousSearchHref && !pending && (
+        <div className={styles.resume}>
+          <a href={previousSearchHref}>Continue previous search</a>
+        </div>
+      )}
     </section>
   );
 }

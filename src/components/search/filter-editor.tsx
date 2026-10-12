@@ -1,11 +1,18 @@
 "use client";
 
-import { useId, useMemo, useRef, useState, type ReactNode } from "react";
+import {
+  useContext,
+  useId,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { DropdownMenu as Menu } from "radix-ui";
 import {
   Combobox,
   ComboboxValue,
-  ComboboxTrigger,
   ComboboxContent,
   ComboboxList,
   ComboboxItem,
@@ -30,6 +37,7 @@ import {
   DialogContent,
   DialogTitle,
   DialogDescription,
+  DialogPortalContext,
 } from "@/components/ui/dialog";
 import { FilterSelect } from "./filter-select";
 import { Icon } from "./icon";
@@ -40,8 +48,10 @@ import {
   humanize,
   locationLabel,
   removeEditorTokens,
+  removeEmptyEditorRecords,
   setSkillMode,
   stateLabels,
+  stateLabel,
   tokenIsExcluded,
   tokenState,
   tokenValue,
@@ -61,82 +71,121 @@ type Token = {
   canExclude: boolean;
   mode?: string;
   context?: string;
+  plain?: boolean;
   onState: (state: TokenState) => void;
   onRemove: (others?: Token[]) => void;
 };
 const choices = (values: readonly string[]): Choice[] =>
   values.map((value) => ({ value, label: humanize(value) }));
 const equalChoice = (item: Choice, value: Choice) => item.value === value.value;
+const tokenWidthKey = (token: Token) =>
+  JSON.stringify([token.label, token.state, token.excluded, token.mode]);
+const engineeringRoles = vocabulary.roles.filter((role) =>
+  role.endsWith(" Engineer"),
+);
 
 function ValueToken({
   token,
   inCombobox = false,
+  onReveal,
 }: {
   token: Token;
   inCombobox?: boolean;
+  onReveal?: () => void;
 }) {
+  const portalContainer = useContext(DialogPortalContext);
+  const trigger = useRef<HTMLButtonElement>(null);
+  const changingState = useRef(false);
   const content = (
     <>
-      <Menu.Root modal={false}>
-        <Menu.Trigger asChild>
-          <button
-            type="button"
-            className={styles.tokenTrigger}
-            aria-label={`${token.label}, ${stateLabels[token.state]}${token.excluded ? ", excluded condition" : ""}. Change requirement state`}
-          >
-            {(token.state !== "required" || token.excluded) && (
-              <span className={styles.stateMark} aria-hidden="true">
-                {token.state === "preferred" ? "☆" : "−"}
-              </span>
-            )}
-            <span>{token.label}</span>
-            {token.state !== "required" && (
-              <small>{stateLabels[token.state]}</small>
-            )}
-            {token.mode && <small>{token.mode}</small>}
-            <Icon name="chevron" size={13} />
-          </button>
-        </Menu.Trigger>
-        <Menu.Portal>
-          <Menu.Content
-            className={styles.tokenMenu}
-            sideOffset={6}
-            collisionPadding={12}
-          >
-            {token.context && (
-              <Menu.Label className={styles.menuContext}>
-                {token.context}
-              </Menu.Label>
-            )}
-            <Menu.RadioGroup
-              value={token.state}
-              onValueChange={(value) => token.onState(value as TokenState)}
+      {token.plain ? (
+        <span className={styles.tokenTrigger}>{token.label}</span>
+      ) : (
+        <Menu.Root modal={false}>
+          <Menu.Trigger asChild>
+            <button
+              type="button"
+              ref={trigger}
+              className={styles.tokenTrigger}
+              aria-label={`${token.label}, ${stateLabels[token.state]}${token.excluded ? ", excluded condition" : ""}. Change requirement state`}
             >
-              {(["required", "preferred", "exclude"] as const)
-                .filter((state) => state !== "exclude" || token.canExclude)
-                .map((state) => (
-                  <Menu.RadioItem
-                    key={state}
-                    value={state}
-                    className={styles.menuItem}
-                  >
-                    <span>
-                      <strong>{stateLabels[state]}</strong>
-                      {state === "preferred" && (
-                        <small>
-                          Doesn’t filter, ranks these candidates first.
-                        </small>
-                      )}
-                    </span>
-                    <Menu.ItemIndicator>
-                      <Icon name="check" size={16} />
-                    </Menu.ItemIndicator>
-                  </Menu.RadioItem>
-                ))}
-            </Menu.RadioGroup>
-          </Menu.Content>
-        </Menu.Portal>
-      </Menu.Root>
+              {(token.state !== "required" || token.excluded) && (
+                <span className={styles.stateMark} aria-hidden="true">
+                  {token.state === "preferred" ? "☆" : "−"}
+                </span>
+              )}
+              <span>{token.label}</span>
+              {token.mode && <small>{token.mode}</small>}
+            </button>
+          </Menu.Trigger>
+          <Menu.Portal container={portalContainer}>
+            <Menu.Content
+              className={styles.tokenMenu}
+              sideOffset={6}
+              collisionPadding={12}
+              onCloseAutoFocus={(event) => {
+                if (changingState.current) {
+                  event.preventDefault();
+                  changingState.current = false;
+                }
+              }}
+            >
+              {token.context && (
+                <Menu.Label className={styles.menuContext}>
+                  {token.context}
+                </Menu.Label>
+              )}
+              <Menu.RadioGroup
+                value={token.state}
+                onValueChange={(value) => {
+                  const scope =
+                    trigger.current?.closest("[data-requirement-field]") ??
+                    trigger.current?.closest('[role="dialog"]');
+                  const nextLabel = `${token.label}, ${stateLabels[value as TokenState]}`;
+                  changingState.current = true;
+                  onReveal?.();
+                  token.onState(value as TokenState);
+                  requestAnimationFrame(() => {
+                    [
+                      ...(scope?.querySelectorAll<HTMLButtonElement>(
+                        "button",
+                      ) ?? []),
+                    ]
+                      .find((button) =>
+                        button
+                          .getAttribute("aria-label")
+                          ?.startsWith(nextLabel),
+                      )
+                      ?.focus();
+                  });
+                }}
+              >
+                {(["required", "preferred", "exclude"] as const)
+                  .filter((state) => state !== "exclude" || token.canExclude)
+                  .map((state) => (
+                    <Menu.RadioItem
+                      key={state}
+                      value={state}
+                      className={styles.menuItem}
+                    >
+                      <span>
+                        <strong>{stateLabels[state]}</strong>
+                        {state === "preferred" && (
+                          <small>
+                            Doesn’t filter, ranks these candidates first.
+                          </small>
+                        )}
+                      </span>
+                      <Menu.ItemIndicator>
+                        <Icon name="check" size={16} />
+                      </Menu.ItemIndicator>
+                    </Menu.RadioItem>
+                  ))}
+              </Menu.RadioGroup>
+            </Menu.Content>
+          </Menu.Portal>
+        </Menu.Root>
+      )}
       {inCombobox ? (
         <ComboboxChipRemove
           className={styles.tokenRemove}
@@ -158,6 +207,7 @@ function ValueToken({
     <ComboboxChip
       className={styles.token}
       data-state={token.state}
+      data-token-width-key={tokenWidthKey(token)}
       onKeyDown={(event) => {
         // The nested requirement menu and remove button own their keyboard events.
         if (event.target !== event.currentTarget) event.preventBaseUIHandler();
@@ -166,7 +216,11 @@ function ValueToken({
       {content}
     </ComboboxChip>
   ) : (
-    <span className={styles.token} data-state={token.state}>
+    <span
+      className={styles.token}
+      data-state={token.state}
+      data-token-width-key={tokenWidthKey(token)}
+    >
       {content}
     </span>
   );
@@ -180,6 +234,7 @@ function VocabularyField({
   toolbar,
   placeholder,
   multiple = true,
+  fullWidth = false,
 }: {
   label: string;
   options: Choice[];
@@ -188,11 +243,85 @@ function VocabularyField({
   toolbar?: ReactNode;
   placeholder?: string;
   multiple?: boolean;
+  fullWidth?: boolean;
 }) {
   const id = useId();
   const anchor = useComboboxAnchor();
   const [text, setText] = useState("");
   const [open, setOpen] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+  const groupTrigger = useRef<HTMLButtonElement>(null);
+  const roleGroup =
+    label === "Role" &&
+    tokens.length === engineeringRoles.length &&
+    new Set(tokens.map((token) => token.value)).size ===
+      engineeringRoles.length &&
+    tokens.every(
+      (token) =>
+        token.state === "required" &&
+        token.ref.key === "roles" &&
+        token.ref.group === "anyOf" &&
+        token.ref.index === tokens[0].ref.index &&
+        engineeringRoles.includes(token.value ?? ""),
+    );
+  const collapsedRoles = roleGroup && !expanded;
+  const [visibleCount, setVisibleCount] = useState(tokens.length);
+  const tokenWidths = useRef(new Map<string, number>());
+  useLayoutEffect(() => {
+    const container = anchor.current;
+    if (!container || expanded || collapsedRoles) return;
+    function measure() {
+      if (!container) return;
+      container
+        .querySelectorAll<HTMLElement>("[data-token-width-key]")
+        .forEach((element) => {
+          tokenWidths.current.set(
+            element.dataset.tokenWidthKey!,
+            element.getBoundingClientRect().width,
+          );
+        });
+      // Render new values once before measuring; collapsed values are unmounted,
+      // so keyboard navigation cannot land on invisible controls.
+      if (
+        tokens.some((token) => !tokenWidths.current.has(tokenWidthKey(token)))
+      ) {
+        setVisibleCount(tokens.length);
+        return;
+      }
+      const style = getComputedStyle(container);
+      const available =
+        container.clientWidth -
+        parseFloat(style.paddingLeft) -
+        parseFloat(style.paddingRight);
+      const gap = parseFloat(style.columnGap) || 6;
+      const input = container.querySelector("input");
+      const inputWidth = input
+        ? parseFloat(getComputedStyle(input).flexBasis) || 76
+        : 76;
+      let row = 1;
+      let used = 0;
+      let count = 0;
+      for (const token of tokens) {
+        const width = Math.min(
+          tokenWidths.current.get(tokenWidthKey(token))!,
+          available,
+        );
+        if (used && used + gap + width > available) {
+          row++;
+          used = 0;
+        }
+        used += (used ? gap : 0) + width;
+        // Reserve room for the type-ahead on the second row as well.
+        if (row + (used + gap + inputWidth > available ? 1 : 0) > 2) break;
+        count++;
+      }
+      setVisibleCount(Math.max(tokens.length ? 1 : 0, count));
+    }
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, [anchor, expanded, collapsedRoles, tokens, visibleCount]);
   const selected = useMemo(
     () =>
       tokens.map((token) => ({
@@ -203,7 +332,10 @@ function VocabularyField({
     [tokens],
   );
   return (
-    <div className={styles.field}>
+    <div
+      className={`${styles.field} ${fullWidth ? styles.fullWidth : ""}`}
+      data-requirement-field
+    >
       <div className={styles.fieldHeading}>
         <label htmlFor={id}>{label}</label>
         {toolbar}
@@ -222,7 +354,10 @@ function VocabularyField({
           ) {
             details.cancel();
             setText("");
-          } else setText(value);
+          } else {
+            setText(value);
+            if (details.reason === "input-change") setOpen(true);
+          }
         }}
         open={open}
         onOpenChange={(next, details) => {
@@ -250,20 +385,71 @@ function VocabularyField({
           setText("");
         }}
       >
-        <ComboboxChips ref={anchor} aria-label={`${label} selections`}>
+        <ComboboxChips
+          id={`${id}-values`}
+          ref={anchor}
+          className={styles.fieldChips}
+          aria-label={`${label} selections`}
+        >
           <ComboboxValue>
             {() =>
-              tokens.map((token) => (
-                <ValueToken
-                  key={token.id}
-                  token={token}
-                  inCombobox={multiple}
-                />
-              ))
+              collapsedRoles ? (
+                <span className={styles.token} data-state="required">
+                  <button
+                    ref={groupTrigger}
+                    type="button"
+                    className={styles.tokenTrigger}
+                    aria-label="Show engineering role values"
+                    aria-expanded={false}
+                    aria-controls={`${id}-values`}
+                    onKeyDown={(event) => event.stopPropagation()}
+                    onClick={() => {
+                      setExpanded(true);
+                      requestAnimationFrame(() =>
+                        anchor.current
+                          ?.querySelector<HTMLButtonElement>(
+                            `button[aria-label$="Change requirement state"]`,
+                          )
+                          ?.focus(),
+                      );
+                    }}
+                  >
+                    Engineering roles ({tokens.length})
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.tokenRemove}
+                    aria-label="Remove all engineering roles"
+                    onKeyDown={(event) => event.stopPropagation()}
+                    onClick={() => {
+                      tokens[0].onRemove(tokens.slice(1));
+                      requestAnimationFrame(() =>
+                        anchor.current
+                          ?.querySelector<HTMLInputElement>("input")
+                          ?.focus(),
+                      );
+                    }}
+                  >
+                    <Icon name="close" size={13} />
+                  </button>
+                </span>
+              ) : (
+                (expanded ? tokens : tokens.slice(0, visibleCount)).map(
+                  (token) => (
+                    <ValueToken
+                      key={token.id}
+                      token={token}
+                      inCombobox={multiple}
+                      onReveal={() => setExpanded(true)}
+                    />
+                  ),
+                )
+              )
             }
           </ComboboxValue>
           <ComboboxChipsInput
             id={id}
+            onClick={() => setOpen(true)}
             placeholder={
               tokens.length
                 ? multiple
@@ -273,6 +459,17 @@ function VocabularyField({
             }
             autoComplete="off"
             onKeyDown={(event) => {
+              if (
+                event.key === "Backspace" &&
+                !text &&
+                !expanded &&
+                (collapsedRoles || visibleCount < tokens.length)
+              ) {
+                event.preventDefault();
+                event.preventBaseUIHandler();
+                setExpanded(true);
+                return;
+              }
               if (event.key !== "Enter") return;
               // Enter selects a suggestion; it never submits the dialog form.
               event.preventDefault();
@@ -282,7 +479,6 @@ function VocabularyField({
               }
             }}
           />
-          <ComboboxTrigger aria-label={`Choose ${label.toLowerCase()}`} />
         </ComboboxChips>
         <ComboboxContent anchor={anchor}>
           <ComboboxEmpty>No matching values.</ComboboxEmpty>
@@ -295,6 +491,22 @@ function VocabularyField({
           </ComboboxList>
         </ComboboxContent>
       </Combobox>
+      {((!collapsedRoles && visibleCount < tokens.length) ||
+        (roleGroup && expanded)) && (
+        <button
+          type="button"
+          className={styles.showValues}
+          aria-expanded={expanded}
+          aria-label={`${expanded ? "Show fewer" : "Show all"} ${label.toLowerCase()} values`}
+          onClick={() => {
+            setExpanded(!expanded);
+            if (roleGroup && expanded)
+              requestAnimationFrame(() => groupTrigger.current?.focus());
+          }}
+        >
+          {expanded ? "Show less" : `Show all (${tokens.length})`}
+        </button>
+      )}
     </div>
   );
 }
@@ -331,6 +543,125 @@ function NumberField({
     </label>
   );
 }
+
+function ConditionCard({
+  label,
+  token,
+  initiallyOpen,
+  children,
+}: {
+  label: string;
+  token: Token;
+  initiallyOpen: boolean;
+  children: ReactNode;
+}) {
+  const id = useId();
+  const [open, setOpen] = useState(initiallyOpen);
+  const portalContainer = useContext(DialogPortalContext);
+  const stateTrigger = useRef<HTMLButtonElement>(null);
+  const changingState = useRef(false);
+  return (
+    <section className={styles.record} data-state={token.state}>
+      <div className={styles.recordHeading}>
+        <button
+          type="button"
+          className={styles.recordSummary}
+          title={label}
+          aria-expanded={open}
+          aria-controls={id}
+          onClick={() => setOpen(!open)}
+        >
+          <span>{label}</span>
+          <Icon name="chevron" size={14} />
+        </button>
+        <Menu.Root modal={false}>
+          <Menu.Trigger asChild>
+            <button
+              type="button"
+              ref={stateTrigger}
+              className={styles.recordState}
+              aria-label={`${label}: ${stateLabels[token.state]}. Change condition state`}
+            >
+              {stateLabels[token.state]}
+            </button>
+          </Menu.Trigger>
+          <Menu.Portal container={portalContainer}>
+            <Menu.Content
+              className={styles.tokenMenu}
+              sideOffset={6}
+              collisionPadding={12}
+              onCloseAutoFocus={(event) => {
+                if (changingState.current) event.preventDefault();
+              }}
+            >
+              <Menu.RadioGroup
+                value={token.state}
+                onValueChange={(value) => {
+                  const dialog =
+                    stateTrigger.current?.closest('[role="dialog"]');
+                  changingState.current = true;
+                  token.onState(value as TokenState);
+                  requestAnimationFrame(() => {
+                    [
+                      ...(dialog?.querySelectorAll<HTMLButtonElement>(
+                        "button",
+                      ) ?? []),
+                    ]
+                      .find(
+                        (button) =>
+                          button.getAttribute("aria-label") ===
+                          `${label}: ${stateLabels[value as TokenState]}. Change condition state`,
+                      )
+                      ?.focus();
+                    changingState.current = false;
+                  });
+                }}
+              >
+                {(["required", "preferred", "exclude"] as const).map(
+                  (state) => (
+                    <Menu.RadioItem
+                      key={state}
+                      value={state}
+                      className={styles.menuItem}
+                    >
+                      <strong>{stateLabels[state]}</strong>
+                      <Menu.ItemIndicator>
+                        <Icon name="check" size={16} />
+                      </Menu.ItemIndicator>
+                    </Menu.RadioItem>
+                  ),
+                )}
+              </Menu.RadioGroup>
+            </Menu.Content>
+          </Menu.Portal>
+        </Menu.Root>
+        <button
+          type="button"
+          className={styles.recordRemove}
+          aria-label={`Remove ${label} condition`}
+          onClick={() => {
+            const section = stateTrigger.current?.closest(
+              "[data-condition-section]",
+            );
+            token.onRemove();
+            requestAnimationFrame(() =>
+              section
+                ?.querySelector<HTMLButtonElement>("[data-add-condition]")
+                ?.focus(),
+            );
+          }}
+        >
+          <Icon name="close" size={14} />
+        </button>
+      </div>
+      {open && (
+        <div id={id} className={styles.recordFields}>
+          {children}
+        </div>
+      )}
+    </section>
+  );
+}
 const locationChoices = [
   ...vocabulary.locations.map((location) => ({
     value: JSON.stringify(location),
@@ -342,7 +673,7 @@ const locationChoices = [
   })),
   ...vocabulary.states.map((state) => ({
     value: JSON.stringify({ state }),
-    label: state,
+    label: stateLabel(state),
   })),
   ...vocabulary.countries.map((country) => ({
     value: JSON.stringify({ country }),
@@ -363,10 +694,6 @@ export function FilterEditor({
   const titleRef = useRef<HTMLHeadingElement>(null);
   const [branch, setBranch] = useState(0);
   const [error, setError] = useState("");
-  const [historyOpen, setHistoryOpen] = useState(false);
-  const [educationOpen, setEducationOpen] = useState(false);
-  const [newHistory, setNewHistory] = useState(false);
-  const [newEducation, setNewEducation] = useState(false);
   const current = draft.anyOf[branch] ?? {};
   const mixedSkills =
     !!current.skillsAll?.length && !!current.skillsAny?.length;
@@ -466,18 +793,20 @@ export function FilterEditor({
   const education = refs(["education"]);
   function historyLabel(job: SearchExperience) {
     return [
-      ...(job.companyTypes ?? []).map(humanize),
-      ...(job.companies ?? []),
-      ...(job.titles ?? []),
+      job.companyTypes?.map(humanize).join(" or "),
+      job.companies?.join(" or "),
+      job.titles?.join(" or "),
       humanize(job.scope),
-    ].join(" · ");
+    ]
+      .filter(Boolean)
+      .join(" · ");
   }
   function educationLabel(item: SearchEducation) {
     return (
       [
-        ...(item.fields ?? []),
-        ...(item.degrees ?? []),
-        ...(item.schools ?? []),
+        item.fields?.join(" or "),
+        item.degrees?.join(" or "),
+        item.schools?.join(" or "),
         item.minGraduationYear ? `From ${item.minGraduationYear}` : "",
         item.maxGraduationYear ? `By ${item.maxGraduationYear}` : "",
       ]
@@ -505,16 +834,25 @@ export function FilterEditor({
       <VocabularyField
         label={label}
         options={choices(values)}
+        toolbar={
+          selected.length > 1 ? (
+            <span className={styles.fieldHint}>Any one</span>
+          ) : undefined
+        }
         tokens={selected.map((value, index) => ({
           ...makeToken(ref, humanize(value)),
+          plain: true,
           id: `${key}-${index}`,
           value,
           context: `Changes apply to this entire ${ref.key === "experience" ? "work history" : "education"} requirement.`,
-          onRemove: () =>
+          onRemove: (others = []) =>
             changeRecord(
               ref,
               key,
-              selected.filter((_, i) => i !== index),
+              selected.filter(
+                (item, i) =>
+                  i !== index && !others.some((token) => token.value === item),
+              ),
             ),
         }))}
         onSelect={(value) =>
@@ -523,8 +861,7 @@ export function FilterEditor({
       />
     );
   }
-  const historyId = useId();
-  const educationId = useId();
+  const extraTokens = tokens(["maxYears", "excludeLocations"]);
   return (
     <Dialog
       open
@@ -551,12 +888,13 @@ export function FilterEditor({
         <form
           onSubmit={(event) => {
             event.preventDefault();
+            const cleaned = removeEmptyEditorRecords(draft);
             const next = {
               ...draft,
-              anyOf: draft.anyOf.filter(
+              anyOf: cleaned.anyOf.filter(
                 (criteria) => Object.keys(criteria).length,
               ),
-              preferred: draft.preferred.filter(
+              preferred: cleaned.preferred.filter(
                 (criteria) => Object.keys(criteria).length,
               ),
             };
@@ -579,8 +917,8 @@ export function FilterEditor({
               </DialogTitle>
               <DialogDescription asChild>
                 <p>
-                  Candidates must match every requirement unless you mark it
-                  “Nice to have”.
+                  All requirements must match. Click a value or condition state
+                  to mark it Nice to have or Exclude.
                 </p>
               </DialogDescription>
             </div>
@@ -619,9 +957,26 @@ export function FilterEditor({
                 {error}
               </p>
             )}
-            <div className={styles.grid}>
+            {draft.anyOf.length > 1 && (
+              <div className={styles.branchChoice}>
+                <FilterSelect
+                  label="Accepted requirements"
+                  value={String(branch)}
+                  options={draft.anyOf.map((_, index) => ({
+                    value: String(index),
+                    label: `Set ${index + 1}`,
+                  }))}
+                  onChange={(value) => setBranch(Number(value))}
+                />
+                <p className={styles.hint}>
+                  Candidates can match any set. Editing set {branch + 1}.
+                </p>
+              </div>
+            )}
+            <div className={`${styles.grid} ${styles.primaryGrid}`}>
               <VocabularyField
                 label="Role"
+                fullWidth
                 options={choices(vocabulary.roles)}
                 tokens={tokens(["roles", "excludeRoles"])}
                 onSelect={(value) => add("roles", value)}
@@ -632,8 +987,21 @@ export function FilterEditor({
                 tokens={tokens(["seniorities", "excludeSeniorities"])}
                 onSelect={(value) => add("seniorities", value)}
               />
+              <div className={styles.field}>
+                <NumberField
+                  label="Experience (min years)"
+                  value={current.minYears}
+                  onChange={(value) => set("minYears", value)}
+                />
+                <div className={styles.numberTokens}>
+                  {tokens(["minYears"]).map((token) => (
+                    <ValueToken key={token.id} token={token} />
+                  ))}
+                </div>
+              </div>
               <VocabularyField
                 label="Skills"
+                fullWidth
                 options={choices(vocabulary.skills)}
                 tokens={tokens(["skillsAll", "skillsAny", "skillsNone"])}
                 onSelect={(value) =>
@@ -662,18 +1030,6 @@ export function FilterEditor({
                   </div>
                 }
               />
-              <div className={styles.field}>
-                <NumberField
-                  label="Experience (min years)"
-                  value={current.minYears}
-                  onChange={(value) => set("minYears", value)}
-                />
-                <div className={styles.numberTokens}>
-                  {tokens(["minYears"]).map((token) => (
-                    <ValueToken key={token.id} token={token} />
-                  ))}
-                </div>
-              </div>
               <VocabularyField
                 label="Location"
                 options={locationChoices}
@@ -695,208 +1051,52 @@ export function FilterEditor({
               />
             </div>
             <div className={styles.moreRows}>
-              <button
-                type="button"
-                className={styles.disclosure}
-                aria-expanded={historyOpen}
-                aria-controls={historyId}
-                onClick={() => setHistoryOpen(!historyOpen)}
+              <section
+                className={styles.conditionSection}
+                aria-label="Work history requirements"
+                data-condition-section
               >
-                <span>
-                  <strong>
-                    {history.length ? "Work history" : "+ Add work history"}
-                  </strong>
-                  {history.length > 0 && (
-                    <small>
-                      {history
-                        .map((ref) =>
-                          historyLabel(
-                            tokenValue(draft, ref) as SearchExperience,
-                          ),
-                        )
-                        .join("; ")}
-                    </small>
-                  )}
-                </span>
-                <Icon name="chevron" size={16} />
-              </button>
-              {historyOpen && (
-                <div id={historyId} className={styles.expanded}>
-                  {history.map((ref) => (
-                    <section
-                      key={`${ref.group}-${ref.index}-${ref.valueIndex}`}
-                      className={styles.record}
+                <h3>Work history</h3>
+                {history.map((ref, index) => {
+                  const job = tokenValue(draft, ref) as SearchExperience;
+                  const empty =
+                    job.scope === "any" &&
+                    !job.companyTypes?.length &&
+                    !job.companies?.length &&
+                    !job.titles?.length;
+                  const label = empty
+                    ? "New work history condition"
+                    : historyLabel(job);
+                  const previousRequired = history
+                    .slice(0, index)
+                    .some(
+                      (previous) =>
+                        previous.group === "anyOf" &&
+                        !tokenIsExcluded(draft, previous),
+                    );
+                  return (
+                    <div
+                      key={`work-${ref.group}-${ref.index}-${ref.valueIndex}`}
                     >
-                      <ValueToken
-                        token={makeToken(
-                          ref,
-                          historyLabel(
-                            tokenValue(draft, ref) as SearchExperience,
-                          ),
+                      {ref.group === "anyOf" &&
+                        !job.exclude &&
+                        previousRequired && (
+                          <p className={styles.conditionJoin}>
+                            And also worked at
+                          </p>
                         )}
-                      />
-                      {recordField(
-                        ref,
-                        "companyTypes",
-                        "Company type",
-                        vocabulary.companyTypes,
-                      )}
-                    </section>
-                  ))}
-                  {(newHistory || !history.length) && (
-                    <VocabularyField
-                      label="Company type"
-                      options={choices(vocabulary.companyTypes)}
-                      tokens={[]}
-                      onSelect={(value) => {
-                        add("experience", {
-                          scope: "any",
-                          companyTypes: [value],
-                        });
-                        setNewHistory(false);
-                      }}
-                    />
-                  )}
-                  {history.length > 0 && !newHistory && (
-                    <button
-                      type="button"
-                      className={styles.textButton}
-                      onClick={() => setNewHistory(true)}
-                    >
-                      + Add work history
-                    </button>
-                  )}
-                </div>
-              )}
-              <button
-                type="button"
-                className={styles.disclosure}
-                aria-expanded={educationOpen}
-                aria-controls={educationId}
-                onClick={() => setEducationOpen(!educationOpen)}
-              >
-                <span>
-                  <strong>
-                    {education.length ? "Education" : "+ Add education"}
-                  </strong>
-                  {education.length > 0 && (
-                    <small>
-                      {education
-                        .map((ref) =>
-                          educationLabel(
-                            tokenValue(draft, ref) as SearchEducation,
-                          ),
-                        )
-                        .join("; ")}
-                    </small>
-                  )}
-                </span>
-                <Icon name="chevron" size={16} />
-              </button>
-              {educationOpen && (
-                <div id={educationId} className={styles.expanded}>
-                  {education.map((ref) => (
-                    <section
-                      key={`${ref.group}-${ref.index}-${ref.valueIndex}`}
-                      className={styles.record}
-                    >
-                      <ValueToken
-                        token={makeToken(
-                          ref,
-                          educationLabel(
-                            tokenValue(draft, ref) as SearchEducation,
-                          ),
-                        )}
-                      />
-                      {recordField(
-                        ref,
-                        "fields",
-                        "Education",
-                        vocabulary.fields,
-                      )}
-                    </section>
-                  ))}
-                  {(newEducation || !education.length) && (
-                    <VocabularyField
-                      label="Education"
-                      options={choices(vocabulary.fields)}
-                      tokens={[]}
-                      placeholder="Search fields of study…"
-                      onSelect={(value) => {
-                        add("education", { fields: [value] });
-                        setNewEducation(false);
-                      }}
-                    />
-                  )}
-                  {education.length > 0 && !newEducation && (
-                    <button
-                      type="button"
-                      className={styles.textButton}
-                      onClick={() => setNewEducation(true)}
-                    >
-                      + Add education
-                    </button>
-                  )}
-                </div>
-              )}
-              <details className={styles.advanced}>
-                <summary>
-                  Advanced <Icon name="chevron" size={16} />
-                </summary>
-                <div className={styles.advancedContent}>
-                  {draft.anyOf.length > 1 && (
-                    <FilterSelect
-                      label="Accepted requirements"
-                      value={String(branch)}
-                      anyLabel="Choose a set"
-                      options={draft.anyOf.map((_, index) => ({
-                        value: String(index),
-                        label: `Set ${index + 1}`,
-                      }))}
-                      onChange={(value) => setBranch(Number(value))}
-                    />
-                  )}
-                  {draft.anyOf.length > 1 && (
-                    <p className={styles.hint}>
-                      A candidate can match any accepted set. You’re editing set{" "}
-                      {branch + 1}.
-                    </p>
-                  )}
-                  <div className={styles.grid}>
-                    <div className={styles.field}>
-                      <NumberField
-                        label="Experience (max years)"
-                        value={current.maxYears}
-                        onChange={(value) => set("maxYears", value)}
-                      />
-                      <div className={styles.numberTokens}>
-                        {tokens(["maxYears"]).map((token) => (
-                          <ValueToken key={token.id} token={token} />
-                        ))}
-                      </div>
-                    </div>
-                    <VocabularyField
-                      label="Location"
-                      options={locationChoices}
-                      tokens={tokens(["excludeLocations"])}
-                      placeholder="Search locations to exclude…"
-                      onSelect={(value) =>
-                        add(
-                          "excludeLocations",
-                          JSON.parse(value) as SearchLocation,
-                        )
-                      }
-                    />
-                  </div>
-                  {history.map((ref, index) => {
-                    const job = tokenValue(draft, ref) as SearchExperience;
-                    return (
-                      <section
-                        className={styles.record}
-                        key={`work-${ref.group}-${ref.index}-${ref.valueIndex}`}
+                      <ConditionCard
+                        label={label}
+                        token={makeToken(ref, label)}
+                        initiallyOpen={empty}
                       >
-                        <h3>Work history {index + 1}</h3>
                         <div className={styles.grid}>
+                          {recordField(
+                            ref,
+                            "companyTypes",
+                            "Company type",
+                            vocabulary.companyTypes,
+                          )}
                           {recordField(
                             ref,
                             "companies",
@@ -912,34 +1112,74 @@ export function FilterEditor({
                           <FilterSelect
                             label="When"
                             value={job.scope}
-                            anyLabel="Any job"
                             options={choices(["any", "current", "past"])}
                             onChange={(value) =>
-                              changeRecord(ref, "scope", value || "any")
+                              changeRecord(ref, "scope", value)
                             }
                           />
                         </div>
-                      </section>
+                      </ConditionCard>
+                    </div>
+                  );
+                })}
+                <button
+                  className={styles.textButton}
+                  type="button"
+                  data-add-condition
+                  onClick={() => add("experience", { scope: "any" })}
+                >
+                  {history.length
+                    ? "+ Add another work history condition"
+                    : "+ Add work history"}
+                </button>
+              </section>
+              <section
+                className={styles.conditionSection}
+                aria-label="Education requirements"
+                data-condition-section
+              >
+                <h3>Education</h3>
+                {education.map((ref, index) => {
+                  const item = tokenValue(draft, ref) as SearchEducation;
+                  const empty =
+                    !item.fields?.length &&
+                    !item.degrees?.length &&
+                    !item.schools?.length &&
+                    item.minGraduationYear === undefined &&
+                    item.maxGraduationYear === undefined;
+                  const label = empty
+                    ? "New education condition"
+                    : educationLabel(item);
+                  const previousRequired = education
+                    .slice(0, index)
+                    .some(
+                      (previous) =>
+                        previous.group === "anyOf" &&
+                        !tokenIsExcluded(draft, previous),
                     );
-                  })}
-                  <button
-                    className={styles.textButton}
-                    type="button"
-                    onClick={() => {
-                      add("experience", { scope: "any" });
-                    }}
-                  >
-                    + Add work history
-                  </button>
-                  {education.map((ref, index) => {
-                    const item = tokenValue(draft, ref) as SearchEducation;
-                    return (
-                      <section
-                        className={styles.record}
-                        key={`education-${ref.group}-${ref.index}-${ref.valueIndex}`}
+                  return (
+                    <div
+                      key={`education-${ref.group}-${ref.index}-${ref.valueIndex}`}
+                    >
+                      {ref.group === "anyOf" &&
+                        !item.exclude &&
+                        previousRequired && (
+                          <p className={styles.conditionJoin}>
+                            And also studied
+                          </p>
+                        )}
+                      <ConditionCard
+                        label={label}
+                        token={makeToken(ref, label)}
+                        initiallyOpen={empty}
                       >
-                        <h3>Education {index + 1}</h3>
                         <div className={styles.grid}>
+                          {recordField(
+                            ref,
+                            "fields",
+                            "Field of study",
+                            vocabulary.fields,
+                          )}
                           {recordField(
                             ref,
                             "degrees",
@@ -954,7 +1194,7 @@ export function FilterEditor({
                           )}
                           <NumberField
                             label="Graduated from"
-                            min={1950}
+                            min={1900}
                             max={2100}
                             value={item.minGraduationYear}
                             onChange={(value) =>
@@ -963,7 +1203,7 @@ export function FilterEditor({
                           />
                           <NumberField
                             label="Graduated by"
-                            min={1950}
+                            min={1900}
                             max={2100}
                             value={item.maxGraduationYear}
                             onChange={(value) =>
@@ -971,18 +1211,61 @@ export function FilterEditor({
                             }
                           />
                         </div>
-                      </section>
-                    );
-                  })}
-                  <button
-                    className={styles.textButton}
-                    type="button"
-                    onClick={() => {
-                      add("education", {});
-                    }}
-                  >
-                    + Add education
-                  </button>
+                      </ConditionCard>
+                    </div>
+                  );
+                })}
+                <button
+                  className={styles.textButton}
+                  type="button"
+                  data-add-condition
+                  onClick={() => add("education", {})}
+                >
+                  {education.length
+                    ? "+ Add another education condition"
+                    : "+ Add education"}
+                </button>
+              </section>
+              <details
+                className={styles.advanced}
+                open={extraTokens.length > 0 || undefined}
+              >
+                <summary>
+                  <span>
+                    More requirements
+                    {extraTokens.length > 0
+                      ? ` (${extraTokens.length} active)`
+                      : ""}
+                  </span>
+                  <Icon name="chevron" size={16} />
+                </summary>
+                <div className={styles.advancedContent}>
+                  <div className={styles.grid}>
+                    <div className={styles.field}>
+                      <NumberField
+                        label="Experience (max years)"
+                        value={current.maxYears}
+                        onChange={(value) => set("maxYears", value)}
+                      />
+                      <div className={styles.numberTokens}>
+                        {tokens(["maxYears"]).map((token) => (
+                          <ValueToken key={token.id} token={token} />
+                        ))}
+                      </div>
+                    </div>
+                    <VocabularyField
+                      label="Exclude location"
+                      options={locationChoices}
+                      tokens={tokens(["excludeLocations"])}
+                      placeholder="Search locations to exclude…"
+                      onSelect={(value) =>
+                        add(
+                          "excludeLocations",
+                          JSON.parse(value) as SearchLocation,
+                        )
+                      }
+                    />
+                  </div>
                 </div>
               </details>
             </div>

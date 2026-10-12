@@ -12,7 +12,7 @@
     "test:connection": "node --conditions=react-server --import tsx --test tests/supabase/connection.test.ts",
     "test:auth-unit": "node --conditions=react-server --import tsx --test tests/supabase/auth-response.test.ts",
     "test:auth": "node --test tests/supabase/login.test.mjs",
-    "test:search-unit": "node --conditions=react-server --import tsx --test tests/search/interpretation.test.ts tests/search/billing.test.ts tests/search/requirement-editor.test.ts tests/search/saved-search.test.ts",
+    "test:search-unit": "node --conditions=react-server --import tsx --test tests/search/interpretation.test.ts tests/search/billing.test.ts tests/search/requirement-editor.test.ts tests/search/saved-search.test.ts tests/search/workspace-session.test.ts tests/search/work-history-evidence.test.ts",
     "test:api": "node --env-file=.env.local --test tests/search/api.test.mjs",
     "db:seed": "node scripts/seed.mjs",
     "db:types": "supabase gen types typescript --local --schema public > src/lib/supabase/database.types.ts && prettier --write src/lib/supabase/database.types.ts",

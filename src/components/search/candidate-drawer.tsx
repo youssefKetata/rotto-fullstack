@@ -1,14 +1,23 @@
 "use client";
 
-import { useEffect, useRef, type KeyboardEvent } from "react";
+import {
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  type KeyboardEvent,
+} from "react";
+import { Popover } from "radix-ui";
 import type { Candidate } from "@/lib/search/types";
-import { ProfileImage, ShortlistButton, SkillTags } from "./candidate-row";
+import { AvailabilityStatus, ProfileImage, SkillTags } from "./candidate-row";
+import type { Shortlist } from "@/lib/search/contracts";
 import { Icon } from "./icon";
 import {
   Dialog,
   DialogContent,
   DialogTitle,
   DialogDescription,
+  DialogPortalContext,
 } from "@/components/ui/dialog";
 import styles from "./candidate-drawer.module.css";
 
@@ -17,7 +26,14 @@ export function CandidateDrawer({
   matched,
   saved,
   onClose,
-  onToggle,
+  lists,
+  memberListIds,
+  currentList,
+  membershipPending,
+  membershipError,
+  onRefreshMemberships,
+  onMembership,
+  onCreateList,
   onStep,
   position,
   total,
@@ -26,17 +42,40 @@ export function CandidateDrawer({
   matched: string[];
   saved: boolean;
   onClose: () => void;
-  onToggle: (candidate: Candidate) => void;
+  lists: Shortlist[];
+  memberListIds: string[];
+  currentList?: Shortlist;
+  membershipPending: boolean;
+  membershipError: string;
+  onRefreshMemberships: () => void;
+  onMembership: (
+    list: Shortlist,
+    candidate: Candidate,
+    remove: boolean,
+  ) => void;
+  onCreateList: () => void;
   onStep: (direction: number) => void;
   position: number;
   total: number;
 }) {
   const content = useRef<HTMLDivElement>(null);
   const closeButton = useRef<HTMLButtonElement>(null);
+  const [listsOpen, setListsOpen] = useState(false);
+  const [drawerBoundary, setDrawerBoundary] = useState<HTMLDivElement | null>(
+    null,
+  );
+  const memberLists = lists.filter((list) => memberListIds.includes(list.id));
+  const inCurrentList = !!currentList && memberListIds.includes(currentList.id);
   useEffect(() => {
     content.current?.scrollTo({ top: 0 });
   }, [candidate.id]);
   function navigate(event: KeyboardEvent<HTMLDivElement>) {
+    if (
+      listsOpen ||
+      (event.target instanceof HTMLElement &&
+        event.target.closest("input, [role='menu'], [data-list-picker]"))
+    )
+      return;
     if (event.key === "ArrowDown" || event.key === "ArrowUp") {
       event.preventDefault();
       onStep(event.key === "ArrowDown" ? 1 : -1);
@@ -53,16 +92,23 @@ export function CandidateDrawer({
         className={styles.drawer}
         onKeyDown={navigate}
         onBackdropClick={onClose}
+        onInteractOutside={(event) => {
+          if (
+            event.target instanceof Element &&
+            event.target.closest("[data-sonner-toast]")
+          )
+            event.preventDefault();
+        }}
         onOpenAutoFocus={(event) => {
           event.preventDefault();
           closeButton.current?.focus();
         }}
       >
-        <div className={styles.frame}>
+        <div className={styles.frame} ref={setDrawerBoundary}>
           <header className={styles.toolbar}>
             <span>Candidate profile</span>
             <div>
-              {position >= 0 && (
+              {position >= 0 && total > 1 && (
                 <>
                   <span className={styles.position}>
                     {position + 1} of {total}
@@ -114,10 +160,9 @@ export function CandidateDrawer({
                 {candidate.years_experience} years of experience
               </p>
               {candidate.open_to_work && (
-                <span className={styles.open}>
-                  <Icon name="check" size={15} />
-                  Open to work
-                </span>
+                <div className={styles.open}>
+                  <AvailabilityStatus />
+                </div>
               )}
             </div>
             <section className={styles.section}>
@@ -176,15 +221,133 @@ export function CandidateDrawer({
             </section>
           </div>
           <footer className={styles.footer}>
-            <span>Choose a named list for your team.</span>
-            <ShortlistButton
-              candidate={candidate}
-              saved={saved}
-              onToggle={onToggle}
-            />
+            <Popover.Root
+              open={listsOpen}
+              onOpenChange={(open) => {
+                setListsOpen(open);
+                if (open && !membershipPending) onRefreshMemberships();
+              }}
+            >
+              <div className={styles.membership}>
+                <span>
+                  {memberLists.length
+                    ? memberLists.length === 1
+                      ? `In ${memberLists[0].name}`
+                      : `In ${memberLists.length} lists`
+                    : "Not in a shortlist"}
+                </span>
+                {memberLists.length > 0 && (
+                  <Popover.Trigger asChild>
+                    <button type="button" className={styles.changeLists}>
+                      Manage
+                    </button>
+                  </Popover.Trigger>
+                )}
+              </div>
+              {inCurrentList && currentList ? (
+                <button
+                  className={styles.shortlistAction}
+                  data-remove
+                  type="button"
+                  disabled={membershipPending}
+                  aria-label={`Remove ${candidate.full_name} from ${currentList.name}`}
+                  onClick={() => onMembership(currentList, candidate, true)}
+                >
+                  <Icon name="close" size={16} />
+                  Remove
+                </button>
+              ) : memberLists.length === 0 ? (
+                <Popover.Trigger asChild>
+                  <button
+                    type="button"
+                    className={styles.shortlistAction}
+                    aria-label={`Choose shortlists for ${candidate.full_name}`}
+                  >
+                    <Icon name="bookmark" size={16} filled={saved} />
+                    Shortlist
+                  </button>
+                </Popover.Trigger>
+              ) : null}
+              <DrawerListPicker
+                lists={lists}
+                boundary={drawerBoundary}
+                memberListIds={memberListIds}
+                pending={membershipPending}
+                error={membershipError}
+                onMembership={(list, remove) =>
+                  onMembership(list, candidate, remove)
+                }
+                onCreate={() => {
+                  setListsOpen(false);
+                  onCreateList();
+                }}
+              />
+            </Popover.Root>
           </footer>
         </div>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function DrawerListPicker({
+  boundary,
+  lists,
+  memberListIds,
+  pending,
+  error,
+  onMembership,
+  onCreate,
+}: {
+  boundary: HTMLDivElement | null;
+  lists: Shortlist[];
+  memberListIds: string[];
+  pending: boolean;
+  error: string;
+  onMembership: (list: Shortlist, remove: boolean) => void;
+  onCreate: () => void;
+}) {
+  const portalContainer = useContext(DialogPortalContext);
+  return (
+    <Popover.Portal container={portalContainer}>
+      <Popover.Content
+        className={styles.listPicker}
+        side="top"
+        align="start"
+        sideOffset={10}
+        collisionPadding={16}
+        collisionBoundary={boundary}
+        aria-label="Choose shortlists"
+        data-list-picker
+      >
+        <h3>Choose shortlists</h3>
+        <div aria-busy={pending}>
+          {lists.map((list) => {
+            const member = memberListIds.includes(list.id);
+            return (
+              <button
+                key={list.id}
+                type="button"
+                disabled={pending}
+                aria-pressed={member}
+                onClick={() => onMembership(list, member)}
+              >
+                <span>{list.name}</span>
+                <Icon name={member ? "check" : "bookmark"} size={16} />
+              </button>
+            );
+          })}
+          {!lists.length && <p>Create a list to shortlist this candidate.</p>}
+          {error && (
+            <p role="alert" className={styles.pickerError}>
+              {error}
+            </p>
+          )}
+          <button type="button" disabled={pending} onClick={onCreate}>
+            + Create a list
+          </button>
+        </div>
+      </Popover.Content>
+    </Popover.Portal>
   );
 }
