@@ -154,7 +154,7 @@ export function useSearchWorkspace({
     setError("");
     setPageError("");
   }, []);
-  const ready = useWorkspaceSession({
+  const { ready, restoringSearch } = useWorkspaceSession({
     companyId,
     recruiterId,
     brief,
@@ -184,6 +184,7 @@ export function useSearchWorkspace({
         operation.path ===
         `/api/saved-briefs/${encodeURIComponent(item.id)}/rerun`,
     );
+    if (saved) setView("search");
     setError("");
     setRetry(null);
     try {
@@ -415,6 +416,7 @@ export function useSearchWorkspace({
     searchSaved,
     planPending,
     ready,
+    restoringSearch,
     previousSearchId,
     error,
     setError,

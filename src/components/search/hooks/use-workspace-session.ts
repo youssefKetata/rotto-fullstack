@@ -54,6 +54,7 @@ export function useWorkspaceSession({
   loadList,
 }: Options) {
   const [ready, setReady] = useState(false);
+  const [restoringSearch, setRestoringSearch] = useState(false);
   const storageKey =
     companyId && recruiterId
       ? `rotto-workspace-v1:${companyId}:${recruiterId}`
@@ -85,6 +86,7 @@ export function useWorkspaceSession({
     }
     async function restore() {
       const { url, saved, searchId: id, draft } = entry();
+      setRestoringSearch(Boolean(id));
       const jobs = await Promise.allSettled([
         searchApi<CompanyPlan>("/api/plan", { signal: controller.signal }),
         searchApi<Shortlist[]>("/api/shortlists", {
@@ -129,6 +131,7 @@ export function useWorkspaceSession({
       window.history.replaceState(window.history.state, "", currentUrl);
       const failure = jobs.find((job) => job.status === "rejected");
       if (failure?.status === "rejected") setError(message(failure.reason));
+      setRestoringSearch(false);
       setReady(true);
       const personId = url.searchParams.get("candidate");
       if (personId) {
@@ -148,6 +151,7 @@ export function useWorkspaceSession({
     }
     async function fromHistory() {
       const { url, searchId: id, draft } = entry();
+      setRestoringSearch(Boolean(id));
       try {
         if (id) {
           const result = await searchApi<SearchResponse>(
@@ -162,6 +166,7 @@ export function useWorkspaceSession({
           clearSearch();
           setBrief(draft ?? "");
         }
+        if (active) setRestoringSearch(false);
         const personId = url.searchParams.get("candidate");
         if (personId) {
           const person = await searchApi<Candidate>(
@@ -174,7 +179,10 @@ export function useWorkspaceSession({
           }
         } else if (active) setCandidate(null);
       } catch (cause) {
-        if (active) setError(message(cause));
+        if (active) {
+          setRestoringSearch(false);
+          setError(message(cause));
+        }
       }
     }
     void restore();
@@ -225,5 +233,5 @@ export function useWorkspaceSession({
     }
   }, [storageKey, ready, brief, search?.search_id, previousSearchId]);
 
-  return ready;
+  return { ready, restoringSearch };
 }

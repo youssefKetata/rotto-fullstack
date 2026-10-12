@@ -60,6 +60,7 @@ export function SearchWorkspace({
     searchSaved,
     planPending,
     ready,
+    restoringSearch,
     previousSearchId,
     error,
     setError,
@@ -213,7 +214,7 @@ export function SearchWorkspace({
         </div>
       </header>
       <div className={styles.body}>
-        {view === "search" && (
+        {view === "search" && !restoringSearch && (
           <BriefForm
             brief={brief}
             onChange={company && ready ? setBrief : undefined}
@@ -484,8 +485,12 @@ export function SearchWorkspace({
                             <Icon name="more" size={18} />
                           </button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
+                        <DropdownMenuContent
+                          align="end"
+                          className={styles.savedMenu}
+                        >
                           <DropdownMenuItem
+                            className={styles.savedMenuItem}
                             onSelect={() => {
                               workspace.setSavedError("");
                               workspace.setSavedName(saved);
@@ -494,6 +499,7 @@ export function SearchWorkspace({
                             Rename
                           </DropdownMenuItem>
                           <DropdownMenuItem
+                            className={styles.savedMenuItem}
                             onSelect={() => {
                               workspace.setSavedError("");
                               workspace.setSavedRemoval(saved);
@@ -574,23 +580,23 @@ export function SearchWorkspace({
             )}
           </div>
         )}
-        {((view === "search" && (search || pending)) ||
+        {((view === "search" && (search || pending || restoringSearch)) ||
           view === "shortlists") && (
           <section
             className={styles.results}
             aria-label={
               view === "shortlists" ? "Shortlist candidates" : "Search results"
             }
-            aria-busy={pending || collectionPending}
+            aria-busy={pending || restoringSearch || collectionPending}
           >
             <div className={styles.resultHeading}>
               <div className={styles.resultCount}>
                 <h2
-                  tabIndex={-1}
+                  // tabIndex={-1}
                   ref={count}
                   aria-label={resultStatus || undefined}
                 >
-                  {pending
+                  {pending || restoringSearch
                     ? "Finding candidates…"
                     : view === "shortlists"
                       ? `${visible.length} shortlisted`
@@ -603,16 +609,20 @@ export function SearchWorkspace({
                   </p>
                 )}
               </div>
-              {view === "search" && search && search.total > 0 && !pending && (
-                <span className={styles.rankNote}>
-                  {adjusted ? "Previous requirements · " : ""}
-                  {search.filters.preferred.length
-                    ? "Most nice-to-have requirements matched first, then years of experience"
-                    : "Most years of experience first"}
-                </span>
-              )}
+              {view === "search" &&
+                search &&
+                search.total > 0 &&
+                !pending &&
+                !restoringSearch && (
+                  <span className={styles.rankNote}>
+                    {adjusted ? "Previous requirements · " : ""}
+                    {search.filters.preferred.length
+                      ? "Most nice-to-have requirements matched first, then years of experience"
+                      : "Most years of experience first"}
+                  </span>
+                )}
             </div>
-            {(pending && !search) ||
+            {((pending || restoringSearch) && (!search || restoringSearch)) ||
             (collectionPending && view === "shortlists") ? (
               <div className={styles.skeletons} aria-hidden="true">
                 {Array.from({ length: 4 }, (_, index) => (
