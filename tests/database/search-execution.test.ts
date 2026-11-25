@@ -74,7 +74,10 @@ test("checkout reservation is shared per company and signed Stripe state control
         reservations[0].attempt_id,
       );
     } finally {
-      await sql`delete from private.billing_events where event_id in (${eventId}, ${eventId + "wrongmode"}, ${eventId + "cancel"})`;
+      await sql.begin(async (tx) => {
+        await tx`delete from private.subscriptions where company_id = ${companyId} and stripe_subscription_id = ${subscription}`;
+        await tx`delete from private.billing_events where event_id in (${eventId}, ${eventId + "wrongmode"}, ${eventId + "cancel"})`;
+      });
     }
   });
 });
