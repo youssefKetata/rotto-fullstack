@@ -33,12 +33,14 @@ export function WorkspaceDialog({
   onClose,
   children,
   initialFocus,
+  selectInitialText,
 }: {
   title: string;
   description: ReactNode;
   onClose: () => void;
   children: ReactNode;
   initialFocus?: RefObject<HTMLInputElement | null>;
+  selectInitialText?: boolean;
 }) {
   return (
     <Dialog
@@ -54,6 +56,7 @@ export function WorkspaceDialog({
           if (initialFocus?.current) {
             event.preventDefault();
             initialFocus.current.focus();
+            if (selectInitialText) initialFocus.current.select();
           }
         }}
       >
@@ -84,10 +87,12 @@ export function NameDialog({
   onSave,
   onClose,
   searchName = false,
+  candidateName,
 }: {
   title: string;
   initial?: string;
   searchName?: boolean;
+  candidateName?: string;
   pending: boolean;
   error: string;
   onSave: (name: string) => void;
@@ -100,12 +105,15 @@ export function NameDialog({
     <WorkspaceDialog
       title={title}
       description={
-        searchName
-          ? "The brief and requirements stay the same."
-          : "A name that helps your team find these people again."
+        candidateName
+          ? `${candidateName} will be added as soon as you create the list.`
+          : searchName
+            ? "The brief and requirements stay the same."
+            : "A name that helps your team find these people again."
       }
       onClose={onClose}
       initialFocus={nameInput}
+      selectInitialText={Boolean(candidateName && initial)}
     >
       <form
         className={styles.nameForm}
@@ -147,7 +155,13 @@ export function NameDialog({
           >
             <PendingLabel
               pending={pending}
-              idle={searchName ? "Save name" : "Save list"}
+              idle={
+                candidateName
+                  ? "Create and add"
+                  : searchName
+                    ? "Save name"
+                    : "Save list"
+              }
               loading="Saving…"
             />
           </button>

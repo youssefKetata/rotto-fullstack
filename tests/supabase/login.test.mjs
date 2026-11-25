@@ -144,7 +144,18 @@ test("both seeded recruiters get their own workspace and can sign out", async ()
     assert.equal(workspace.status, 200);
     const html = (await workspace.text()).replace(/<!--.*?-->/gs, "");
     assert.ok(html.includes(`${name} account`));
-    assert.ok(html.includes("Describe who"));
+    assert.ok(html.includes('aria-label="Search results"'));
+    assert.ok(html.includes("Loading workspace…"));
+    assert.ok(!html.includes("Describe who"));
+
+    const searchPage = await fetch(
+      `${base}/?search=00000000-0000-4000-8000-000000000001`,
+      { headers: { Cookie: cookie } },
+    );
+    const searchHtml = await searchPage.text();
+    assert.equal(searchPage.status, 200);
+    assert.ok(searchHtml.includes('aria-label="Search results"'));
+    assert.ok(!searchHtml.includes("Describe who"));
 
     const logout = await fetch(`${base}/api/auth/logout`, {
       method: "POST",

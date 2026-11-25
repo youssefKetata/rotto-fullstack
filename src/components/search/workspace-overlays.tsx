@@ -47,6 +47,7 @@ export function WorkspaceOverlays({
     dialogError,
     setDialogError,
     setNameAction,
+    startCandidateShortlist,
     nameAction,
     collectionPending,
     saveName,
@@ -152,10 +153,7 @@ export function WorkspaceOverlays({
           onMembership={(list, person, remove) =>
             void membership(list, person, remove)
           }
-          onCreateList={() => {
-            setDialogError("");
-            setNameAction({ kind: "create" });
-          }}
+          onCreateList={() => startCandidateShortlist(candidate)}
           position={profilePeople.findIndex(
             (person) => person.id === candidate.id,
           )}
@@ -211,11 +209,6 @@ export function WorkspaceOverlays({
                 </button>
               );
             })}
-            {!lists.length && (
-              <p className={styles.trust}>
-                Create your first list, then add this candidate.
-              </p>
-            )}
             {dialogError && (
               <p className={styles.dialogError} role="alert">
                 {dialogError}
@@ -225,30 +218,43 @@ export function WorkspaceOverlays({
               className={styles.addList}
               type="button"
               disabled={pickerPending}
-              onClick={() => {
-                setDialogError("");
-                setNameAction({ kind: "create" });
-              }}
+              onClick={() => startCandidateShortlist(picker)}
             >
-              + Create a list
+              + New shortlist
             </button>
           </div>
         </WorkspaceDialog>
       )}
       {nameAction && (
         <NameDialog
-          key={nameAction.kind === "rename" ? nameAction.list.id : "create"}
-          title={
-            nameAction.kind === "create"
-              ? "Create a shortlist."
-              : "Rename this list."
+          key={
+            nameAction.kind === "rename" ? nameAction.list.id : nameAction.kind
           }
-          initial={nameAction.kind === "rename" ? nameAction.list.name : ""}
+          title={
+            nameAction.kind === "rename"
+              ? "Rename this list."
+              : "Create a shortlist."
+          }
+          initial={
+            nameAction.kind === "rename"
+              ? nameAction.list.name
+              : nameAction.kind === "create-with-candidate" && !lists.length
+                ? "Shortlist"
+                : ""
+          }
+          candidateName={
+            nameAction.kind === "create-with-candidate"
+              ? nameAction.person.full_name
+              : undefined
+          }
           pending={collectionPending}
           error={dialogError}
           onSave={(name) => void saveName(name)}
           onClose={() => {
-            if (!collectionPending) setNameAction(null);
+            if (!collectionPending) {
+              setDialogError("");
+              setNameAction(null);
+            }
           }}
         />
       )}

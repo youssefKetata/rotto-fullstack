@@ -1,7 +1,12 @@
 import "server-only";
 import { DataNotFoundError } from "./errors";
 import type { UserDataClient } from "./client";
-import type { ShortlistMembership } from "@/lib/search/contracts";
+import { getDatabase } from "./pool";
+import type {
+  Shortlist,
+  ShortlistMembership,
+  ShortlistWithMember,
+} from "@/lib/search/contracts";
 
 export async function listShortlists(supabase: UserDataClient) {
   const { data, error } = await supabase
@@ -20,6 +25,54 @@ export async function createShortlist(supabase: UserDataClient, name: string) {
     .single();
   if (error) throw new Error("Shortlist creation failed");
   return data;
+}
+
+export async function createShortlistWithMember(
+  recruiterId: string,
+  listId: string,
+  name: string,
+  candidateId: string,
+): Promise<ShortlistWithMember> {
+  type SavedList = Shortlist & ShortlistMembership;
+  return getDatabase().begin(async (sql) => {
+    const [created] = await sql<SavedList[]>`
+      with new_list as (
+        insert into public.shortlists (id, company_id, created_by, name)
+        select ${listId}, recruiter.company_id, recruiter.id, ${name}
+        from public.recruiters recruiter
+        join public.candidates candidate on candidate.id = ${candidateId}
+        where recruiter.id = ${recruiterId}
+        on conflict (id) do nothing
+        returning id, name, created_at, updated_at, created_by
+      ), new_member as (
+        insert into public.shortlist_people (shortlist_id, candidate_id, added_by)
+        select id, ${candidateId}, created_by from new_list
+        returning shortlist_id, candidate_id, added_at, added_by
+      )
+      select list.id, list.name, list.created_at, list.updated_at,
+             member.candidate_id, member.added_at, member.added_by
+      from new_list list join new_member member on member.shortlist_id = list.id`;
+
+    // A retry can arrive after the first request committed but its response was lost.
+    const [saved] = created
+      ? [created]
+      : await sql<SavedList[]>`
+      select list.id, list.name, list.created_at, list.updated_at,
+             member.candidate_id, member.added_at, member.added_by
+      from public.shortlists list
+      join public.recruiters recruiter on recruiter.company_id = list.company_id
+        and recruiter.id = list.created_by
+      join public.shortlist_people member on member.shortlist_id = list.id
+        and member.added_by = recruiter.id
+      where list.id = ${listId} and recruiter.id = ${recruiterId}
+        and member.candidate_id = ${candidateId}`;
+    if (!saved)
+      throw new DataNotFoundError(
+        "Couldn’t save this candidate to a new shortlist.",
+      );
+    const { candidate_id, added_at, added_by, ...list } = saved;
+    return { ...list, membership: { candidate_id, added_at, added_by } };
+  });
 }
 
 export async function readShortlist(supabase: UserDataClient, id: string) {

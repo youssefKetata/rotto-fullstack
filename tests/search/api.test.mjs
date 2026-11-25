@@ -264,6 +264,46 @@ test("Bearer APIs, company isolation, quota, paging and signed billing", async (
   );
 
   await t.test(
+    "a new shortlist saves its first candidate atomically",
+    async () => {
+      const create = (body, status = 201, as = a) =>
+        request("/api/shortlists", { method: "POST", body, status, as });
+      const body = {
+        name: " Frontend team ",
+        listId: randomUUID(),
+        candidateId: "cand_0001",
+      };
+      const [first, retry] = await Promise.all([create(body), create(body)]);
+      assert.deepEqual(first.data, retry.data);
+      assert.equal(first.data.id, body.listId);
+      assert.equal(first.data.name, "Frontend team");
+      assert.equal(first.data.membership.added_by, a.user);
+      const detail = (await request(`/api/shortlists/${body.listId}`)).data;
+      assert.deepEqual(
+        detail.people.map((person) => person.id),
+        [body.candidateId],
+      );
+      assert.equal(detail.memberships.length, 1);
+      assert.equal(detail.memberships[0].added_by, a.user);
+      assert.equal(
+        Date.parse(detail.memberships[0].added_at),
+        Date.parse(first.data.membership.added_at),
+      );
+
+      await create(body, 404, b);
+      await create({ ...body, candidateId: "cand_0002" }, 404);
+      const missing = {
+        ...body,
+        listId: randomUUID(),
+        candidateId: "cand_9999",
+      };
+      await create(missing, 404);
+      await request(`/api/shortlists/${missing.listId}`, { status: 404 });
+      await request(`/api/shortlists/${body.listId}`, { method: "DELETE" });
+    },
+  );
+
+  await t.test(
     "foreign company identifiers and direct Supabase access stay isolated",
     async () => {
       for (const [method, path, body] of [

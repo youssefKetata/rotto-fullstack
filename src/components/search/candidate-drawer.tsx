@@ -66,6 +66,17 @@ export function CandidateDrawer({
   );
   const memberLists = lists.filter((list) => memberListIds.includes(list.id));
   const inCurrentList = !!currentList && memberListIds.includes(currentList.id);
+  const shortlistButton = (
+    <button
+      type="button"
+      className={styles.shortlistAction}
+      aria-label={`Shortlist ${candidate.full_name}`}
+      onClick={lists.length ? undefined : onCreateList}
+    >
+      <Icon name="bookmark" size={16} filled={saved} />
+      Shortlist
+    </button>
+  );
   useEffect(() => {
     content.current?.scrollTo({ top: 0 });
   }, [candidate.id]);
@@ -257,16 +268,11 @@ export function CandidateDrawer({
                   Remove
                 </button>
               ) : memberLists.length === 0 ? (
-                <Popover.Trigger asChild>
-                  <button
-                    type="button"
-                    className={styles.shortlistAction}
-                    aria-label={`Choose shortlists for ${candidate.full_name}`}
-                  >
-                    <Icon name="bookmark" size={16} filled={saved} />
-                    Shortlist
-                  </button>
-                </Popover.Trigger>
+                lists.length ? (
+                  <Popover.Trigger asChild>{shortlistButton}</Popover.Trigger>
+                ) : (
+                  shortlistButton
+                )
               ) : null}
               <DrawerListPicker
                 lists={lists}
@@ -337,14 +343,13 @@ function DrawerListPicker({
               </button>
             );
           })}
-          {!lists.length && <p>Create a list to shortlist this candidate.</p>}
           {error && (
             <p role="alert" className={styles.pickerError}>
               {error}
             </p>
           )}
           <button type="button" disabled={pending} onClick={onCreate}>
-            + Create a list
+            + New shortlist
           </button>
         </div>
       </Popover.Content>

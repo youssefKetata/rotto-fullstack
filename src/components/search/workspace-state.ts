@@ -1,4 +1,5 @@
 import type { Shortlist } from "@/lib/search/contracts";
+import type { CandidateSummary } from "@/lib/search/types";
 
 export type WorkspaceIdentity = {
   companyId?: string;
@@ -11,7 +12,9 @@ export type SearchOperation = {
   key: string;
 };
 export type NameAction =
-  { kind: "create" } | { kind: "rename"; list: Shortlist };
+  | { kind: "create" }
+  | { kind: "create-with-candidate"; person: CandidateSummary; listId: string }
+  | { kind: "rename"; list: Shortlist };
 
 export function errorMessage(cause: unknown): string {
   return cause instanceof Error

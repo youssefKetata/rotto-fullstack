@@ -34,6 +34,9 @@ export type ShortlistMembership = {
   added_at: string;
   added_by: string;
 };
+export type ShortlistWithMember = Shortlist & {
+  membership: ShortlistMembership;
+};
 export type ShortlistDetail = Shortlist & {
   people: Candidate[];
   memberships: ShortlistMembership[];

@@ -13,6 +13,7 @@ import type {
   Shortlist,
   ShortlistDetail,
   ShortlistMembership,
+  ShortlistWithMember,
 } from "@/lib/search/contracts";
 import type { CandidateSummary } from "@/lib/search/types";
 import { errorMessage as message, type NameAction } from "../workspace-state";
@@ -66,8 +67,21 @@ export function useShortlists({ setError, setNotice }: Options) {
     }
   }
   async function openPicker(person: CandidateSummary) {
+    if (lists.length === 0) {
+      startCandidateShortlist(person);
+      return;
+    }
     setPicker(person);
     await refreshMemberships();
+  }
+
+  function startCandidateShortlist(person: CandidateSummary) {
+    setDialogError("");
+    setNameAction({
+      kind: "create-with-candidate",
+      person,
+      listId: crypto.randomUUID(),
+    });
   }
 
   // Serialize membership changes so Undo can wait for an in-flight removal.
@@ -195,7 +209,30 @@ export function useShortlists({ setError, setNotice }: Options) {
     setCollectionPending(true);
     setDialogError("");
     try {
-      if (nameAction.kind === "create") {
+      if (nameAction.kind === "create-with-candidate") {
+        const { person, listId } = nameAction;
+        const { membership, ...list } = await searchApi<ShortlistWithMember>(
+          "/api/shortlists",
+          {
+            method: "POST",
+            body: JSON.stringify({ name, listId, candidateId: person.id }),
+          },
+        );
+        setLists((previous) => [
+          list,
+          ...previous.filter((item) => item.id !== list.id),
+        ]);
+        setListPeople((previous) => ({ ...previous, [list.id]: [person] }));
+        setListMemberships((previous) => ({
+          ...previous,
+          [list.id]: [membership],
+        }));
+        setActiveList((previous) => previous ?? list.id);
+        setPicker(null);
+        const confirmation = `${person.full_name} added to ${list.name}.`;
+        setNotice(confirmation);
+        toast.success(confirmation);
+      } else if (nameAction.kind === "create") {
         const created = await searchApi<{ id: string }>("/api/shortlists", {
           method: "POST",
           body: JSON.stringify({ name }),
@@ -290,6 +327,7 @@ export function useShortlists({ setError, setNotice }: Options) {
     loadList,
     selectList,
     openPicker,
+    startCandidateShortlist,
     refreshMemberships,
     membership,
     saveName,

@@ -66,7 +66,7 @@ export function SearchWorkspace({
     searchSaved,
     planPending,
     ready,
-    restoringSearch,
+    restoringSearch: sessionRestoringSearch,
     previousSearchId,
     error,
     setError,
@@ -93,6 +93,9 @@ export function SearchWorkspace({
     saveSearch,
     showLists,
   } = workspace;
+  // The streamed shell and the authenticated workspace share the same first
+  // frame. Show results placeholders until restoration chooses the real view.
+  const restoringSearch = !ready || sessionRestoringSearch;
   const brief = rerunning?.brief ?? currentBrief;
   const search = rerunning ? null : completedSearch;
   const filters = rerunning?.filters ?? currentFilters;
@@ -602,11 +605,13 @@ export function SearchWorkspace({
                   ref={count}
                   aria-label={resultStatus || undefined}
                 >
-                  {pending || restoringSearch
-                    ? "Finding candidates…"
-                    : view === "shortlists"
-                      ? `${visible.length} shortlisted`
-                      : `${search?.total.toLocaleString() ?? 0} ${search?.total === 1 ? "candidate" : "candidates"}`}
+                  {restoringSearch
+                    ? "Loading workspace…"
+                    : pending
+                      ? "Finding candidates…"
+                      : view === "shortlists"
+                        ? `${visible.length} shortlisted`
+                        : `${search?.total.toLocaleString() ?? 0} ${search?.total === 1 ? "candidate" : "candidates"}`}
                 </h2>
                 {view === "search" && unchecked.length > 0 && (
                   <p className={styles.notChecked}>
