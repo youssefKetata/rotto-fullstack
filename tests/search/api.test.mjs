@@ -498,6 +498,41 @@ test("Bearer APIs, company isolation, quota, paging and signed billing", async (
     },
   );
 
+  if (
+    process.env.ROTTO_DEMO_UPGRADE === "1" ||
+    process.env.CODESPACES === "true"
+  ) {
+    await t.test(
+      "demo upgrade is authenticated, company-scoped and idempotent",
+      async () => {
+        const path = "/api/plan/demo-upgrade";
+        const eventId = `rotto-demo-${a.company}`;
+        eventIds.push(eventId);
+        assert.equal((await request("/api/plan")).data.searches_remaining, 0);
+        const otherPlan = (await request("/api/plan", { as: b })).data;
+        await request(path, { method: "POST", as: null, status: 401 });
+        const upgrades = await Promise.all([
+          request(path, { method: "POST" }),
+          request(path, { method: "POST" }),
+        ]);
+        for (const { data } of upgrades)
+          assert.deepEqual(data, { plan: "paid", searches_remaining: null });
+        assert.deepEqual(
+          (await request("/api/plan", { as: b })).data,
+          otherPlan,
+        );
+        const [event] =
+          await sql`select outcome from private.billing_events where event_id = ${eventId}`;
+        assert.equal(event.outcome, "applied");
+        const rerun = await request(`/api/search/${search.search_id}/rerun`, {
+          method: "POST",
+          body: { filters },
+        });
+        assert.equal(rerun.data.searches_remaining, null);
+      },
+    );
+  }
+
   if (process.env.ROTTO_LIVE_GEMINI === "1")
     await t.test(
       "free Gemini search and a repeated HTTP delivery",

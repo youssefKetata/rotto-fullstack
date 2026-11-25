@@ -30,7 +30,8 @@ export function SearchWorkspace({
   company,
   companyId,
   recruiterId,
-}: WorkspaceIdentity & { company?: string }) {
+  demoUpgrade = false,
+}: WorkspaceIdentity & { company?: string; demoUpgrade?: boolean }) {
   const workspace = useSearchWorkspace({ companyId, recruiterId });
   const {
     brief: currentBrief,
@@ -802,6 +803,7 @@ export function SearchWorkspace({
             : `${notice} ${resultStatus}`.trim()}
       </span>
       <WorkspaceOverlays
+        demoUpgrade={demoUpgrade}
         workspace={workspace}
         onRequirementsChange={updateRequirements}
       />

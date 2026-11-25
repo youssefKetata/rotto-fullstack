@@ -3,6 +3,7 @@ import { Brand } from "@/components/brand";
 import { LogoutButton } from "@/components/logout-button";
 import { SearchWorkspace } from "@/components/search/search-workspace";
 import { getRecruiter } from "@/lib/supabase/auth";
+import { demoUpgradeEnabled } from "@/lib/billing";
 import styles from "./workspace.module.css";
 
 async function Workspace() {
@@ -36,6 +37,7 @@ async function Workspace() {
       company={company.name}
       companyId={context.recruiter.company_id}
       recruiterId={context.recruiter.id}
+      demoUpgrade={demoUpgradeEnabled()}
     />
   );
 }

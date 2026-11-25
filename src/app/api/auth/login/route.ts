@@ -1,5 +1,6 @@
 import { authResponse, isSameOrigin } from "@/lib/auth-response";
 import { createClient } from "@/lib/supabase/server";
+import { readRecruiterMembership } from "@/lib/supabase/auth";
 
 export async function POST(request: Request) {
   if (!isSameOrigin(request)) {
@@ -58,11 +59,7 @@ export async function POST(request: Request) {
       }
       return authResponse({ error: "Email or password is incorrect." }, 401);
     }
-    const membership = await supabase
-      .from("recruiters")
-      .select("id")
-      .eq("id", data.user.id)
-      .maybeSingle();
+    const membership = await readRecruiterMembership(supabase, data.user.id);
     if (membership.error || !membership.data) {
       await supabase.auth.signOut({ scope: "local" });
       return authResponse(

@@ -11,14 +11,17 @@ import {
 import { Icon } from "./icon";
 import type { WorkspaceModel } from "./hooks/use-search-workspace";
 import type { SearchFilters } from "@/lib/search/schema";
+import { searchApi } from "@/lib/search/browser";
 import styles from "./search-workspace.module.css";
 
 export function WorkspaceOverlays({
   workspace,
   onRequirementsChange,
+  demoUpgrade,
 }: {
   workspace: WorkspaceModel;
   onRequirementsChange: (filters: SearchFilters) => void;
+  demoUpgrade: boolean;
 }) {
   const {
     editFilters,
@@ -286,6 +289,14 @@ export function WorkspaceOverlays({
           onClose={() => setUpgrade(false)}
           onRefresh={async () => (await refreshPlan())?.plan ?? null}
           refreshing={planPending}
+          onUpgrade={
+            demoUpgrade
+              ? async () => {
+                  await searchApi("/api/plan/demo-upgrade", { method: "POST" });
+                  return (await refreshPlan())?.plan ?? null;
+                }
+              : undefined
+          }
         />
       )}
     </>

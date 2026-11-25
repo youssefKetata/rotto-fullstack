@@ -1,3 +1,4 @@
+import { listSearchHistory } from "@/lib/search/search-history";
 import {
   briefValue,
   json,
@@ -19,13 +20,6 @@ export async function POST(request: Request) {
 
 export async function GET(request: Request) {
   return withRecruiter(request, async ({ supabase }) => {
-    const { data, error } = await supabase
-      .from("searches")
-      .select("id,brief,filters,total,status,created_at")
-      .eq("status", "completed")
-      .order("created_at", { ascending: false })
-      .limit(50);
-    if (error) throw new Error("Search history unavailable");
-    return json(data ?? []);
+    return json(await listSearchHistory(supabase));
   });
 }

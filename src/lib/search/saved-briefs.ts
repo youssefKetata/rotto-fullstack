@@ -1,6 +1,85 @@
 import "server-only";
 import { getDatabase } from "@/lib/database";
 import type { SavedBrief } from "./contracts";
+import type { SearchFilters } from "./schema";
+import { ApiError, type RecruiterContext } from "@/lib/api";
+
+type Client = RecruiterContext["supabase"];
+
+export async function saveBrief(
+  { supabase, recruiter }: RecruiterContext,
+  brief: string,
+  filters: SearchFilters,
+) {
+  const inserted = await supabase
+    .from("saved_briefs")
+    .insert({ brief, filters })
+    .select("id")
+    .single();
+  let id: string;
+  const created = !inserted.error;
+  if (inserted.error?.code === "23505") {
+    const existing = await supabase
+      .from("saved_briefs")
+      .select("id")
+      .eq("company_id", recruiter.company_id)
+      .eq("brief", brief)
+      .eq("filters", JSON.stringify(filters))
+      .single();
+    if (existing.error) throw new Error("Saved search read failed");
+    id = existing.data.id;
+  } else {
+    if (inserted.error) throw new Error("Saving search failed");
+    id = inserted.data.id;
+  }
+  const saved = (await savedBriefsForRecruiter(recruiter.id)).find(
+    (item) => item.id === id,
+  );
+  if (!saved) throw new Error("Saved search read failed");
+  return { saved, created };
+}
+
+export async function readSavedBrief(supabase: Client, id: string) {
+  const { data, error } = await supabase
+    .from("saved_briefs")
+    .select("brief,filters")
+    .eq("id", id)
+    .maybeSingle();
+  if (error) throw new Error("Saved search read failed");
+  if (!data)
+    throw new ApiError(404, "NOT_FOUND", "This saved search was not found.");
+  return data;
+}
+
+export async function renameSavedBrief(
+  supabase: Client,
+  id: string,
+  name: string,
+) {
+  const { data, error } = await supabase
+    .from("saved_briefs")
+    .update({ name })
+    .eq("id", id)
+    .select("id,name")
+    .maybeSingle();
+  if (error) throw new Error("Saved search rename failed");
+  if (!data)
+    throw new ApiError(404, "NOT_FOUND", "This saved search was not found.");
+  return data;
+}
+
+export async function deleteSavedBrief(supabase: Client, id: string) {
+  const { data, error } = await supabase
+    .from("saved_briefs")
+    .delete()
+    .eq("id", id)
+    .select("id")
+    .maybeSingle();
+  if (error) throw new Error("Saved search removal failed");
+  if (!data)
+    throw new ApiError(404, "NOT_FOUND", "This saved search was not found.");
+  return { ok: true };
+}
 
 /** Only completed results for this company's exact saved brief and filters qualify. */
 export async function savedBriefsForRecruiter(

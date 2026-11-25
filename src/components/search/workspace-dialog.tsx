@@ -161,16 +161,23 @@ export function UpgradeDialog({
   onClose,
   onRefresh,
   refreshing,
+  onUpgrade,
 }: {
   onClose: () => void;
   onRefresh: () => Promise<"free" | "paid" | null>;
   refreshing: boolean;
+  onUpgrade?: () => Promise<"free" | "paid" | null>;
 }) {
   const [feedback, setFeedback] = useState("");
+  const [upgrading, setUpgrading] = useState(false);
   return (
     <WorkspaceDialog
       title="Your free search is used"
-      description="Ask your workspace administrator to activate a paid plan for new searches."
+      description={
+        onUpgrade
+          ? "Activate the demo plan to run more searches and refine your requirements. No payment is required."
+          : "Ask your workspace administrator to activate a paid plan for new searches."
+      }
       onClose={onClose}
     >
       <div className={styles.upgradeContent}>
@@ -186,10 +193,40 @@ export function UpgradeDialog({
             : feedback || "Already activated? Check your plan."}
         </p>
         <footer>
+          {onUpgrade && (
+            <button
+              className={styles.primaryButton}
+              type="button"
+              disabled={upgrading || refreshing}
+              onClick={async () => {
+                setUpgrading(true);
+                setFeedback("");
+                try {
+                  if ((await onUpgrade()) !== "paid") {
+                    setFeedback(
+                      "We couldn’t confirm the upgrade. Try checking your plan.",
+                    );
+                  }
+                } catch {
+                  setFeedback(
+                    "We couldn’t activate the demo plan. Please try again.",
+                  );
+                } finally {
+                  setUpgrading(false);
+                }
+              }}
+            >
+              <PendingLabel
+                pending={upgrading}
+                idle="Activate demo plan"
+                loading="Activating…"
+              />
+            </button>
+          )}
           <button
-            className={styles.primaryButton}
+            className={onUpgrade ? undefined : styles.primaryButton}
             type="button"
-            disabled={refreshing}
+            disabled={refreshing || upgrading}
             onClick={async () => {
               const plan = await onRefresh();
               setFeedback(

@@ -18,6 +18,7 @@ for (const name of ["NEXT_PUBLIC_SUPABASE_URL", "DATABASE_URL"]) {
 delete process.env.ROTTO_LIVE_GEMINI;
 process.env.GEMINI_API_KEY = "cloud-checks-do-not-call-provider";
 process.env.STRIPE_WEBHOOK_SECRET ||= "whsec_rotto_assessment_sample";
+process.env.ROTTO_DEMO_UPGRADE = "1";
 process.env.ROTTO_TEST_BASE_URL = "http://localhost:3100";
 const npm = resolve(
   process.env.npm_execpath || "/usr/local/lib/node_modules/npm/bin/npm-cli.js",

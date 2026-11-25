@@ -1,11 +1,25 @@
 import type { Database } from "@/lib/supabase/types";
 import "server-only";
 
-import { createClient as createSupabaseClient } from "@supabase/supabase-js";
+import {
+  createClient as createSupabaseClient,
+  type SupabaseClient,
+} from "@supabase/supabase-js";
 import { getSupabaseConfig } from "./config";
 import { createClient } from "./server";
 
 type Recruiter = { id: string; company_id: string };
+
+export function readRecruiterMembership(
+  supabase: SupabaseClient<Database>,
+  userId: string,
+) {
+  return supabase
+    .from("recruiters")
+    .select("id, company_id")
+    .eq("id", userId)
+    .maybeSingle<Recruiter>();
+}
 
 // Pass a Request for Bearer-only API auth; omit it for cookie-based pages/actions.
 export async function getRecruiter(request?: Request) {
@@ -34,11 +48,8 @@ export async function getRecruiter(request?: Request) {
     return null;
   }
 
-  const { data: recruiter, error: membershipError } = await supabase
-    .from("recruiters")
-    .select("id, company_id")
-    .eq("id", data.user.id)
-    .maybeSingle<Recruiter>();
+  const { data: recruiter, error: membershipError } =
+    await readRecruiterMembership(supabase, data.user.id);
 
   if (membershipError) throw new Error("Unable to load recruiter membership.");
   if (!recruiter) return null;

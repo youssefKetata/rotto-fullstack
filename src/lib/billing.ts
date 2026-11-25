@@ -3,6 +3,41 @@ import "server-only";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { getDatabase } from "@/lib/database";
 
+export function demoUpgradeEnabled() {
+  if (
+    process.env.ROTTO_DEMO_UPGRADE !== "1" &&
+    process.env.CODESPACES !== "true"
+  )
+    return false;
+  const loopback = new Set(["localhost", "127.0.0.1", "[::1]"]);
+  return [process.env.DATABASE_URL, process.env.NEXT_PUBLIC_SUPABASE_URL].every(
+    (value) =>
+      value && URL.canParse(value) && loopback.has(new URL(value).hostname),
+  );
+}
+
+export async function activateDemoPlan(recruiterId: string) {
+  const [company] = await getDatabase()<{ id: string; slug: string }[]>`
+    select company.id, company.slug from public.recruiters recruiter
+    join public.companies company on company.id = recruiter.company_id
+    where recruiter.id = ${recruiterId}`;
+  if (!company) return false;
+  const subscription = `rotto-demo-${company.id}`;
+  await applyBillingEvent({
+    id: subscription,
+    type: "customer.subscription.created",
+    created: Math.floor(Date.now() / 1000),
+    data: {
+      object: {
+        id: subscription,
+        status: "active",
+        metadata: { company: company.slug },
+      },
+    },
+  });
+  return true;
+}
+
 export type BillingEvent = {
   id: string;
   type: string;

@@ -1,3 +1,4 @@
+import { readCompletedSearch } from "@/lib/search/search-history";
 import {
   ApiError,
   json,
@@ -24,14 +25,10 @@ export async function POST(
         "INVALID_FILTERS",
         "Choose valid search filters.",
       );
-    const { data, error } = await context.supabase
-      .from("searches")
-      .select("brief,status")
-      .eq("id", uuidValue(search_id))
-      .maybeSingle();
-    if (error) throw new Error("Search read failed");
-    if (!data || data.status !== "completed")
-      throw new ApiError(404, "NOT_FOUND", "This search was not found.");
+    const data = await readCompletedSearch(
+      context.supabase,
+      uuidValue(search_id),
+    );
     return json(
       await executeSearch(context, data.brief, requestKey(request), filters),
     );

@@ -1,3 +1,4 @@
+import { readSavedBrief } from "@/lib/search/saved-briefs";
 import {
   ApiError,
   json,
@@ -17,14 +18,7 @@ export async function POST(
     const id = uuidValue((await params).id);
     const body = await readObject(request);
     onlyKeys(body, []);
-    const { data, error } = await context.supabase
-      .from("saved_briefs")
-      .select("brief,filters")
-      .eq("id", id)
-      .maybeSingle();
-    if (error) throw new Error("Saved search read failed");
-    if (!data)
-      throw new ApiError(404, "NOT_FOUND", "This saved search was not found.");
+    const data = await readSavedBrief(context.supabase, id);
     const filters = validateSearchFilters(data.filters);
     if (!filters)
       throw new ApiError(

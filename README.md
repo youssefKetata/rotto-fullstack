@@ -20,10 +20,12 @@ shortlists, billing and consumed allowance. It preserves provider settings in
 ignored `.env.local`; supply `GEMINI_API_KEY` and `STRIPE_WEBHOOK_SECRET` through
 the environment or that file. The supplied webhook fixture secret is
 `whsec_rotto_assessment_sample`. No Stripe account or checkout is needed.
-For a local paid-plan demo, run
-`node --env-file=.env.local scripts/activate-demo-plan.mjs acme`
-(or `globex`), then click **Check plan** in the Upgrade dialog. This sends a signed
-subscription event to the local webhook; it does not contact Stripe or charge money.
+In Codespaces, use **Activate demo plan** in the upgrade dialog after using the
+free search. The demo changes the company's entitlement without a payment.
+For local development, set `ROTTO_DEMO_UPGRADE=1` in `.env.local` and restart the app.
+Activation requires a loopback Supabase instance.
+To exercise the webhook separately, run
+`node --env-file=.env.local scripts/activate-demo-plan.mjs acme` (or `globex`).
 
 Search uses one direct request to free-tier **Gemini 3.5 Flash-Lite**, with no
 retries or paid fallback. Interpretation has a 15-second deadline to allow for

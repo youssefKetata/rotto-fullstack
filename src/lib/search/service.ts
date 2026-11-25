@@ -11,7 +11,8 @@ import {
   type SearchDatabaseErrorCode,
 } from "./database";
 import { interpretBrief, assertGeminiConfigured, GeminiError } from "./gemini";
-import { SEARCH_PAGE_SIZE, type SearchResponse } from "./contracts";
+import type { SearchResponse } from "./contracts";
+import { readSearchPage } from "./results";
 import { validateSearchFilters, type SearchFilters } from "./schema";
 
 const databaseErrorStatuses: Record<SearchDatabaseErrorCode, number> = {
@@ -72,27 +73,7 @@ export async function readSearch(
   id: string,
   page = 1,
 ): Promise<SearchResponse> {
-  const first = (page - 1) * SEARCH_PAGE_SIZE + 1;
-  // These reads are independent and all candidate/company reads retain caller RLS.
-  const [searchRead, resultsRead, plan] = await Promise.all([
-    context.supabase
-      .from("searches")
-      .select("id,brief,filters,total,status,created_at")
-      .eq("id", id)
-      .maybeSingle(),
-    context.supabase
-      .from("search_results")
-      .select(
-        "position,person:candidates(*,experiences:candidate_experiences(*),education:candidate_education(*))",
-      )
-      .eq("search_id", id)
-      .gte("position", first)
-      .lte("position", first + SEARCH_PAGE_SIZE - 1)
-      .order("position"),
-    planFor(context),
-  ]);
-  const { data: search, error } = searchRead;
-  if (error) throw new Error("Search read failed");
+  const search = await readSearchPage(context.recruiter.id, id, page);
   if (!search)
     throw new ApiError(404, "NOT_FOUND", "This search was not found.");
   if (search.status === "pending")
@@ -107,8 +88,6 @@ export async function readSearch(
       "SEARCH_FAILED",
       "This search did not complete. Please try again.",
     );
-  const { data: rows, error: resultsError } = resultsRead;
-  if (resultsError) throw new Error("Results read failed");
   const filters = validateSearchFilters(search.filters);
   if (!filters) throw new Error("Stored search filters are invalid");
   return {
@@ -116,9 +95,9 @@ export async function readSearch(
     brief: search.brief,
     filters,
     total: search.total,
-    results: (rows ?? []).map((row) => row.person),
+    results: search.results,
     page,
-    searches_remaining: plan.searches_remaining,
+    searches_remaining: search.searches_remaining,
   };
 }
 
