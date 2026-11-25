@@ -1,13 +1,15 @@
 import "server-only";
-import { getDatabase } from "@/lib/database";
-import type { SavedBrief } from "./contracts";
-import type { SearchFilters } from "./schema";
-import { ApiError, type RecruiterContext } from "@/lib/api";
-
-type Client = RecruiterContext["supabase"];
+import { getDatabase } from "@/lib/data/pool";
+import type { SavedBrief } from "@/lib/search/contracts";
+import type { SearchFilters } from "@/lib/search/schema";
+import { DataNotFoundError } from "./errors";
+import type { UserDataClient, RecruiterMembership } from "./client";
 
 export async function saveBrief(
-  { supabase, recruiter }: RecruiterContext,
+  {
+    supabase,
+    recruiter,
+  }: { supabase: UserDataClient; recruiter: RecruiterMembership },
   brief: string,
   filters: SearchFilters,
 ) {
@@ -32,27 +34,24 @@ export async function saveBrief(
     if (inserted.error) throw new Error("Saving search failed");
     id = inserted.data.id;
   }
-  const saved = (await savedBriefsForRecruiter(recruiter.id)).find(
-    (item) => item.id === id,
-  );
+  const [saved] = await querySavedBriefs(recruiter.id, id);
   if (!saved) throw new Error("Saved search read failed");
   return { saved, created };
 }
 
-export async function readSavedBrief(supabase: Client, id: string) {
+export async function readSavedBrief(supabase: UserDataClient, id: string) {
   const { data, error } = await supabase
     .from("saved_briefs")
     .select("brief,filters")
     .eq("id", id)
     .maybeSingle();
   if (error) throw new Error("Saved search read failed");
-  if (!data)
-    throw new ApiError(404, "NOT_FOUND", "This saved search was not found.");
+  if (!data) throw new DataNotFoundError("This saved search was not found.");
   return data;
 }
 
 export async function renameSavedBrief(
-  supabase: Client,
+  supabase: UserDataClient,
   id: string,
   name: string,
 ) {
@@ -63,12 +62,11 @@ export async function renameSavedBrief(
     .select("id,name")
     .maybeSingle();
   if (error) throw new Error("Saved search rename failed");
-  if (!data)
-    throw new ApiError(404, "NOT_FOUND", "This saved search was not found.");
+  if (!data) throw new DataNotFoundError("This saved search was not found.");
   return data;
 }
 
-export async function deleteSavedBrief(supabase: Client, id: string) {
+export async function deleteSavedBrief(supabase: UserDataClient, id: string) {
   const { data, error } = await supabase
     .from("saved_briefs")
     .delete()
@@ -76,16 +74,18 @@ export async function deleteSavedBrief(supabase: Client, id: string) {
     .select("id")
     .maybeSingle();
   if (error) throw new Error("Saved search removal failed");
-  if (!data)
-    throw new ApiError(404, "NOT_FOUND", "This saved search was not found.");
+  if (!data) throw new DataNotFoundError("This saved search was not found.");
   return { ok: true };
 }
 
 /** Only completed results for this company's exact saved brief and filters qualify. */
-export async function savedBriefsForRecruiter(
-  recruiterId: string,
-): Promise<SavedBrief[]> {
-  return getDatabase()<SavedBrief[]>`
+export function savedBriefsForRecruiter(recruiterId: string) {
+  return querySavedBriefs(recruiterId);
+}
+
+async function querySavedBriefs(recruiterId: string, savedId?: string) {
+  const sql = getDatabase();
+  return sql<SavedBrief[]>`
     select saved.id, saved.name, saved.brief, saved.filters,
       saved.created_at::text,
       latest.id as last_search_id, latest.total as last_result_count,
@@ -100,5 +100,6 @@ export async function savedBriefsForRecruiter(
       order by search.completed_at desc, search.id desc limit 1
     ) latest on true
     where recruiter.id = ${recruiterId}
+      ${savedId ? sql`and saved.id = ${savedId}` : sql``}
     order by saved.created_at desc, saved.id`;
 }

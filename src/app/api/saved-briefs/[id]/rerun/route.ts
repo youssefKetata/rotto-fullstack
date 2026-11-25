@@ -1,4 +1,4 @@
-import { readSavedBrief } from "@/lib/search/saved-briefs";
+import { readSavedBrief } from "@/lib/data/saved-briefs";
 import {
   ApiError,
   json,

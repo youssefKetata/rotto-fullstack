@@ -1,13 +1,13 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
-import { getDatabase } from "../../src/lib/database";
+import { getDatabase } from "../../src/lib/data/pool";
 import { applyBillingEvent } from "../../src/lib/billing";
 import {
   beginSearch,
   completeSearch,
   getPlan,
   type SearchExecution,
-} from "../../src/lib/search/database";
+} from "../../src/lib/data/search-execution";
 import type { SearchFilters } from "../../src/lib/search/schema";
 
 export const noMatches: SearchFilters = {

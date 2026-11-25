@@ -6,7 +6,7 @@ import {
   uuidValue,
   withRecruiter,
 } from "@/lib/api";
-import { mutateShortlistMembership } from "@/lib/search/shortlist-membership";
+import { mutateShortlistMembership } from "@/lib/data/shortlist-membership";
 
 type Params = { params: Promise<{ shortlist_id: string; person_id: string }> };
 

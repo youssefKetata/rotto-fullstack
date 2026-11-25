@@ -1,25 +1,10 @@
 import type { Database } from "@/lib/supabase/types";
 import "server-only";
 
-import {
-  createClient as createSupabaseClient,
-  type SupabaseClient,
-} from "@supabase/supabase-js";
+import { createClient as createSupabaseClient } from "@supabase/supabase-js";
+import { readRecruiterMembership } from "@/lib/data/workspaces";
 import { getSupabaseConfig } from "./config";
 import { createClient } from "./server";
-
-type Recruiter = { id: string; company_id: string };
-
-export function readRecruiterMembership(
-  supabase: SupabaseClient<Database>,
-  userId: string,
-) {
-  return supabase
-    .from("recruiters")
-    .select("id, company_id")
-    .eq("id", userId)
-    .maybeSingle<Recruiter>();
-}
 
 // Pass a Request for Bearer-only API auth; omit it for cookie-based pages/actions.
 export async function getRecruiter(request?: Request) {

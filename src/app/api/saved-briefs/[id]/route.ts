@@ -1,4 +1,4 @@
-import { renameSavedBrief, deleteSavedBrief } from "@/lib/search/saved-briefs";
+import { renameSavedBrief, deleteSavedBrief } from "@/lib/data/saved-briefs";
 import {
   json,
   nameValue,

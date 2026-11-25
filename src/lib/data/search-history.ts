@@ -1,9 +1,8 @@
 import "server-only";
-import { ApiError, type RecruiterContext } from "@/lib/api";
+import { DataNotFoundError } from "./errors";
+import type { UserDataClient } from "./client";
 
-type Client = RecruiterContext["supabase"];
-
-export async function listSearchHistory(supabase: Client) {
+export async function listSearchHistory(supabase: UserDataClient) {
   const { data, error } = await supabase
     .from("searches")
     .select("id,brief,filters,total,status,created_at")
@@ -14,7 +13,10 @@ export async function listSearchHistory(supabase: Client) {
   return data ?? [];
 }
 
-export async function readCompletedSearch(supabase: Client, id: string) {
+export async function readCompletedSearch(
+  supabase: UserDataClient,
+  id: string,
+) {
   const { data, error } = await supabase
     .from("searches")
     .select("brief,status")
@@ -22,6 +24,6 @@ export async function readCompletedSearch(supabase: Client, id: string) {
     .maybeSingle();
   if (error) throw new Error("Search read failed");
   if (!data || data.status !== "completed")
-    throw new ApiError(404, "NOT_FOUND", "This search was not found.");
+    throw new DataNotFoundError("This search was not found.");
   return data;
 }

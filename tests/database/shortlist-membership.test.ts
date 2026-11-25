@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import test from "node:test";
-import { ApiError } from "../../src/lib/api";
-import { getDatabase } from "../../src/lib/database";
-import { mutateShortlistMembership } from "../../src/lib/search/shortlist-membership";
+import { DataNotFoundError } from "../../src/lib/data/errors";
+import { getDatabase } from "../../src/lib/data/pool";
+import { mutateShortlistMembership } from "../../src/lib/data/shortlist-membership";
 import { withSearchFixture } from "./search-fixture";
 
 test("shortlist removal, Undo and concurrent membership preserve company boundaries", async (t) => {
@@ -110,7 +110,7 @@ test("shortlist removal, Undo and concurrent membership preserve company boundar
                   add,
                   originalTime,
                 ),
-                (error) => error instanceof ApiError && error.status === 404,
+                (error) => error instanceof DataNotFoundError,
               );
             }
             await assert.rejects(
@@ -121,7 +121,7 @@ test("shortlist removal, Undo and concurrent membership preserve company boundar
                 true,
                 originalTime,
               ),
-              (error) => error instanceof ApiError && error.status === 404,
+              (error) => error instanceof DataNotFoundError,
             );
           },
         );

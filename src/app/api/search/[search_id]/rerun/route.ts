@@ -1,4 +1,4 @@
-import { readCompletedSearch } from "@/lib/search/search-history";
+import { readCompletedSearch } from "@/lib/data/search-history";
 import {
   ApiError,
   json,

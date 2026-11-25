@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import postgres from "postgres";
 import { createGeminiInterpreter } from "../../src/lib/search/gemini";
-import { matchingCandidates } from "../../src/lib/search/query";
+import { matchingCandidates } from "../../src/lib/data/search-query";
 import type { SearchCriteria } from "../../src/lib/search/schema";
 import { regressionCases } from "./regression-cases";
 

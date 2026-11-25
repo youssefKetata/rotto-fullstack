@@ -139,9 +139,9 @@ ordered snapshots, and simultaneous admission/completion. Seeded company data is
 `20261011160000_search_execution.sql` adds only a private attempt ledger and index.
 `20261011180000_remove_business_functions.sql` removes previously installed search
 and billing RPCs. The former uncommitted billing migration was reverted locally.
-Search admission, completion, failure recovery and matching now live in
-`src/lib/search/database.ts` and `query.ts`; subscription updates live in
-`src/lib/billing.ts`. They use short Postgres transactions and the same company
+Search admission, completion, failure recovery and matching live in
+`src/lib/data/search-execution.ts` and `src/lib/data/search-query.ts`. Subscription
+updates live in `src/lib/data/billing.ts`. They use short Postgres transactions and the same company
 lock. Gemini runs between transactions. Expired attempts release reservations;
 replayed request keys return the completed snapshot. Billing events deduplicate
 by ID and apply newer state, with cancellation winning equal-second ties.

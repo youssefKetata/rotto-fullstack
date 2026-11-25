@@ -7,7 +7,7 @@ import {
   withRecruiter,
 } from "@/lib/api";
 import { validateSearchFilters } from "@/lib/search/schema";
-import { saveBrief, savedBriefsForRecruiter } from "@/lib/search/saved-briefs";
+import { saveBrief, savedBriefsForRecruiter } from "@/lib/data/saved-briefs";
 
 export async function GET(request: Request) {
   return withRecruiter(request, async ({ recruiter }) => {

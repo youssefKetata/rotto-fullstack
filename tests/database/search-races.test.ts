@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { getDatabase } from "../../src/lib/database";
-import { SearchDatabaseError } from "../../src/lib/search/database";
+import { getDatabase } from "../../src/lib/data/pool";
+import { SearchDatabaseError } from "../../src/lib/data/search-execution";
 import { withSearchFixture } from "./search-fixture";
 
 test("server transactions serialize real Postgres races", async (t) => {

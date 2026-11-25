@@ -55,11 +55,13 @@ then experience and candidate ID. Every match is stored with a stable position;
 20-result pages read that snapshot. The UI displays all criteria and issues,
 stages edits, and persists named company shortlists and saved briefs.
 
-**Structure:** Search components render the workspace; dedicated hooks own
-actions, shortlists and session restoration. `src/lib/search` holds shared
-contracts, interpretation, parameterized SQL and transaction services. A server-only
-Postgres pool uses `DATABASE_URL`; business logic lives in TypeScript. Supabase
-clients use generated types; regenerate after migrations with `npm run db:types`.
+**Structure:** Search components render the workspace, and dedicated hooks
+coordinate client actions and session restoration. Route handlers validate
+requests and map errors to HTTP responses. `src/lib/data` owns table queries,
+the Postgres pool, and database transactions. Supabase queries use the caller's
+session and RLS. Privileged SQL binds workspace access to the verified recruiter
+or the verified billing event. Regenerate Supabase types after public schema
+changes with `npm run db:types`.
 
 Company locks, attempt leases and idempotency keys enforce one lifetime free
 search, including concurrent requests, refinements and saved-brief reruns.

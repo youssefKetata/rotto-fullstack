@@ -1,9 +1,9 @@
 import "server-only";
 
-import { getDatabase } from "@/lib/database";
+import { getDatabase } from "@/lib/data/pool";
 import type { Json } from "@/lib/supabase/types";
-import { SEARCH_PAGE_SIZE } from "./contracts";
-import type { Candidate, CandidateSummary } from "./types";
+import { SEARCH_PAGE_SIZE } from "@/lib/search/contracts";
+import type { Candidate, CandidateSummary } from "@/lib/search/types";
 
 type SearchPage<Person> = {
   id: string;

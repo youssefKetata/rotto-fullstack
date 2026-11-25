@@ -1,9 +1,8 @@
 import "server-only";
-import { ApiError, type RecruiterContext } from "@/lib/api";
+import { DataNotFoundError } from "./errors";
+import type { UserDataClient } from "./client";
 
-type Client = RecruiterContext["supabase"];
-
-export async function readCandidate(supabase: Client, id: string) {
+export async function readCandidate(supabase: UserDataClient, id: string) {
   const { data, error } = await supabase
     .from("candidates")
     .select(
@@ -12,7 +11,6 @@ export async function readCandidate(supabase: Client, id: string) {
     .eq("id", id)
     .maybeSingle();
   if (error) throw new Error("Candidate read failed");
-  if (!data)
-    throw new ApiError(404, "NOT_FOUND", "This candidate was not found.");
+  if (!data) throw new DataNotFoundError("This candidate was not found.");
   return data;
 }

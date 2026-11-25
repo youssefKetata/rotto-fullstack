@@ -1,4 +1,4 @@
-import { readCandidate } from "@/lib/search/people";
+import { readCandidate } from "@/lib/data/people";
 import { ApiError, json, withRecruiter } from "@/lib/api";
 
 export async function GET(

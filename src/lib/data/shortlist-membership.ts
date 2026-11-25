@@ -1,7 +1,7 @@
 import "server-only";
 
-import { ApiError } from "@/lib/api";
-import { getDatabase } from "@/lib/database";
+import { DataNotFoundError } from "./errors";
+import { getDatabase } from "@/lib/data/pool";
 
 /** Membership and company ownership are checked in the same transaction. */
 export async function mutateShortlistMembership(
@@ -17,13 +17,11 @@ export async function mutateShortlistMembership(
       join public.recruiters as recruiter on recruiter.company_id = list.company_id
       where list.id = ${listId} and recruiter.id = ${recruiterId}
       for share of list, recruiter`;
-    if (!list)
-      throw new ApiError(404, "NOT_FOUND", "This shortlist was not found.");
+    if (!list) throw new DataNotFoundError("This shortlist was not found.");
     if (add) {
       const [person] =
         await sql`select id from public.candidates where id = ${personId}`;
-      if (!person)
-        throw new ApiError(404, "NOT_FOUND", "This candidate was not found.");
+      if (!person) throw new DataNotFoundError("This candidate was not found.");
       await sql`
         insert into public.shortlist_people (shortlist_id, candidate_id, added_by, added_at)
         values (${listId}, ${personId}, ${recruiterId}, coalesce(${restoreAddedAt ?? null}::text::timestamptz, now()))

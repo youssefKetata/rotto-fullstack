@@ -1,4 +1,4 @@
-import { listSearchHistory } from "@/lib/search/search-history";
+import { listSearchHistory } from "@/lib/data/search-history";
 import {
   briefValue,
   json,

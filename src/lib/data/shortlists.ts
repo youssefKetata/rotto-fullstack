@@ -1,10 +1,9 @@
 import "server-only";
-import { ApiError, type RecruiterContext } from "@/lib/api";
-import type { ShortlistMembership } from "./contracts";
+import { DataNotFoundError } from "./errors";
+import type { UserDataClient } from "./client";
+import type { ShortlistMembership } from "@/lib/search/contracts";
 
-type Client = RecruiterContext["supabase"];
-
-export async function listShortlists(supabase: Client) {
+export async function listShortlists(supabase: UserDataClient) {
   const { data, error } = await supabase
     .from("shortlists")
     .select("id,name,created_at,updated_at")
@@ -13,7 +12,7 @@ export async function listShortlists(supabase: Client) {
   return data ?? [];
 }
 
-export async function createShortlist(supabase: Client, name: string) {
+export async function createShortlist(supabase: UserDataClient, name: string) {
   const { data, error } = await supabase
     .from("shortlists")
     .insert({ name })
@@ -23,15 +22,14 @@ export async function createShortlist(supabase: Client, name: string) {
   return data;
 }
 
-export async function readShortlist(supabase: Client, id: string) {
+export async function readShortlist(supabase: UserDataClient, id: string) {
   const { data, error } = await supabase
     .from("shortlists")
     .select("id,name,created_at")
     .eq("id", id)
     .maybeSingle();
   if (error) throw new Error("Shortlist read failed");
-  if (!data)
-    throw new ApiError(404, "NOT_FOUND", "This shortlist was not found.");
+  if (!data) throw new DataNotFoundError("This shortlist was not found.");
   const people: object[] = [];
   const memberships: ShortlistMembership[] = [];
   for (let offset = 0; ; offset += 1000) {
@@ -58,7 +56,7 @@ export async function readShortlist(supabase: Client, id: string) {
 }
 
 export async function renameShortlist(
-  supabase: Client,
+  supabase: UserDataClient,
   id: string,
   name: string,
 ) {
@@ -69,12 +67,11 @@ export async function renameShortlist(
     .select("id,name")
     .maybeSingle();
   if (error) throw new Error("Shortlist rename failed");
-  if (!data)
-    throw new ApiError(404, "NOT_FOUND", "This shortlist was not found.");
+  if (!data) throw new DataNotFoundError("This shortlist was not found.");
   return data;
 }
 
-export async function deleteShortlist(supabase: Client, id: string) {
+export async function deleteShortlist(supabase: UserDataClient, id: string) {
   const { data, error } = await supabase
     .from("shortlists")
     .delete()
@@ -82,7 +79,6 @@ export async function deleteShortlist(supabase: Client, id: string) {
     .select("id")
     .maybeSingle();
   if (error) throw new Error("Shortlist deletion failed");
-  if (!data)
-    throw new ApiError(404, "NOT_FOUND", "This shortlist was not found.");
+  if (!data) throw new DataNotFoundError("This shortlist was not found.");
   return { ok: true };
 }

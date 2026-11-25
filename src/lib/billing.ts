@@ -1,7 +1,8 @@
 import "server-only";
 
 import { createHmac, timingSafeEqual } from "node:crypto";
-import { getDatabase } from "@/lib/database";
+import { recordBillingEvent } from "@/lib/data/billing";
+import { workspaceForRecruiter } from "@/lib/data/workspaces";
 
 export function demoUpgradeEnabled() {
   if (
@@ -17,10 +18,7 @@ export function demoUpgradeEnabled() {
 }
 
 export async function activateDemoPlan(recruiterId: string) {
-  const [company] = await getDatabase()<{ id: string; slug: string }[]>`
-    select company.id, company.slug from public.recruiters recruiter
-    join public.companies company on company.id = recruiter.company_id
-    where recruiter.id = ${recruiterId}`;
+  const company = await workspaceForRecruiter(recruiterId);
   if (!company) return false;
   const subscription = `rotto-demo-${company.id}`;
   await applyBillingEvent({
@@ -101,69 +99,49 @@ export async function applyBillingEvent(
   event: BillingEvent,
   stripeMode?: { live: boolean },
 ) {
-  // Signature verification happens in the route before this server-only writer.
-  await getDatabase().begin(async (sql) => {
-    const inserted =
-      await sql`insert into private.billing_events(event_id,event_type,event_created)
-      values (${event.id},${event.type},${event.created}) on conflict do nothing returning event_id`;
-    if (!inserted.count) return;
-    let outcome = "ignored";
-    const data = objectValue(event.data);
-    const object = objectValue(data?.object);
-    const metadata = objectValue(object?.metadata);
-    const subscription = object?.id;
-    const slug = metadata?.company;
-    const companyId = metadata?.rotto_company_id;
-    const status = object?.status;
-    const verifiedStripeCompany =
-      stripeMode &&
-      event.livemode === stripeMode.live &&
-      object?.object === "subscription" &&
-      typeof companyId === "string" &&
-      /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(companyId)
-        ? companyId
-        : null;
-    if (
-      [
-        "customer.subscription.created",
-        "customer.subscription.updated",
-        "customer.subscription.deleted",
-      ].includes(event.type) &&
-      typeof subscription === "string" &&
-      subscription.length > 0 &&
-      subscription.length <= 255 &&
-      typeof status === "string" &&
-      status.length > 0 &&
-      status.length <= 100 &&
-      (stripeMode
-        ? verifiedStripeCompany !== null &&
-          /^sub_[A-Za-z0-9]+$/.test(subscription)
-        : typeof slug === "string")
-    ) {
-      const [company] = stripeMode
-        ? await sql<
-            { id: string }[]
-          >`select id from public.companies where id = ${verifiedStripeCompany}`
-        : await sql<
-            { id: string }[]
-          >`select id from public.companies where slug = ${String(slug)}`;
-      if (company) {
-        await sql`insert into private.company_usage(company_id) values (${company.id}) on conflict do nothing`;
-        await sql`select company_id from private.company_usage where company_id = ${company.id} for update`;
-        const nextStatus =
-          event.type === "customer.subscription.deleted" ? "canceled" : status;
-        const changed =
-          await sql`insert into private.subscriptions(stripe_subscription_id,company_id,status,last_event_created,last_event_id)
-          values (${subscription},${company.id},${nextStatus},${event.created},${event.id})
-          on conflict (stripe_subscription_id) do update set status = excluded.status,
-            last_event_created = excluded.last_event_created, last_event_id = excluded.last_event_id
-          where private.subscriptions.company_id = excluded.company_id
-            and (excluded.last_event_created > private.subscriptions.last_event_created
-              or (excluded.last_event_created = private.subscriptions.last_event_created
-                and excluded.status = 'canceled' and private.subscriptions.status <> 'canceled'))`;
-        if (changed.count) outcome = "applied";
-      }
-    }
-    await sql`update private.billing_events set outcome = ${outcome}, processed_at = now() where event_id = ${event.id}`;
-  });
+  const data = objectValue(event.data);
+  const object = objectValue(data?.object);
+  const metadata = objectValue(object?.metadata);
+  const subscription = object?.id;
+  const slug = metadata?.company;
+  const companyId = metadata?.rotto_company_id;
+  const status = object?.status;
+  const verifiedStripeCompany =
+    stripeMode &&
+    event.livemode === stripeMode.live &&
+    object?.object === "subscription" &&
+    typeof companyId === "string" &&
+    /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(companyId)
+      ? companyId
+      : null;
+  if (
+    [
+      "customer.subscription.created",
+      "customer.subscription.updated",
+      "customer.subscription.deleted",
+    ].includes(event.type) &&
+    typeof subscription === "string" &&
+    subscription.length > 0 &&
+    subscription.length <= 255 &&
+    typeof status === "string" &&
+    status.length > 0 &&
+    status.length <= 100 &&
+    (stripeMode
+      ? verifiedStripeCompany !== null &&
+        /^sub_[A-Za-z0-9]+$/.test(subscription)
+      : typeof slug === "string")
+  ) {
+    const workspace = verifiedStripeCompany
+      ? { id: verifiedStripeCompany }
+      : { slug: String(slug) };
+    const nextStatus =
+      event.type === "customer.subscription.deleted" ? "canceled" : status;
+    await recordBillingEvent(event, {
+      workspace,
+      subscription,
+      status: nextStatus,
+    });
+    return;
+  }
+  await recordBillingEvent(event);
 }

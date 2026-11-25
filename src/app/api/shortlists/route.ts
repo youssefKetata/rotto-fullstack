@@ -1,4 +1,4 @@
-import { listShortlists, createShortlist } from "@/lib/search/shortlists";
+import { listShortlists, createShortlist } from "@/lib/data/shortlists";
 import {
   json,
   nameValue,

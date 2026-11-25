@@ -1,6 +1,6 @@
 import { authResponse, isSameOrigin } from "@/lib/auth-response";
 import { createClient } from "@/lib/supabase/server";
-import { readRecruiterMembership } from "@/lib/supabase/auth";
+import { readRecruiterMembership } from "@/lib/data/workspaces";
 
 export async function POST(request: Request) {
   if (!isSameOrigin(request)) {

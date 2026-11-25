@@ -3,6 +3,7 @@ import { Brand } from "@/components/brand";
 import { LogoutButton } from "@/components/logout-button";
 import { SearchWorkspace } from "@/components/search/search-workspace";
 import { getRecruiter } from "@/lib/supabase/auth";
+import { readWorkspaceName } from "@/lib/data/workspaces";
 import { demoUpgradeEnabled } from "@/lib/billing";
 import { checkoutConfig } from "@/lib/checkout";
 import styles from "./workspace.module.css";
@@ -26,16 +27,14 @@ async function Workspace() {
       </main>
     );
   }
-  const { data: company, error } = await context.supabase
-    .from("companies")
-    .select("name")
-    .eq("id", context.recruiter.company_id)
-    .single<{ name: string }>();
-  if (error || !company) throw new Error("Unable to load workspace.");
+  const company = await readWorkspaceName(
+    context.supabase,
+    context.recruiter.company_id,
+  );
   return (
     <SearchWorkspace
       key={context.recruiter.id}
-      company={company.name}
+      company={company}
       companyId={context.recruiter.company_id}
       recruiterId={context.recruiter.id}
       demoUpgrade={demoUpgradeEnabled()}

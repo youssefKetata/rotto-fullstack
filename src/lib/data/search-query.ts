@@ -1,7 +1,11 @@
 import "server-only";
 
 import type postgres from "postgres";
-import type { SearchCriteria, SearchFilters, SearchLocation } from "./schema";
+import type {
+  SearchCriteria,
+  SearchFilters,
+  SearchLocation,
+} from "@/lib/search/schema";
 
 type Sql = postgres.ISql;
 type Fragment = postgres.Fragment;

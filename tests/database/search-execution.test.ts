@@ -2,15 +2,15 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import test from "node:test";
-import { getDatabase } from "../../src/lib/database";
+import { getDatabase } from "../../src/lib/data/pool";
 import { applyBillingEvent } from "../../src/lib/billing";
 import { reserveCheckout } from "../../src/lib/checkout";
 import {
   completeSearch,
   failSearch,
   getPlan,
-} from "../../src/lib/search/database";
-import { matchingCandidates } from "../../src/lib/search/query";
+} from "../../src/lib/data/search-execution";
+import { matchingCandidates } from "../../src/lib/data/search-query";
 import { GEMINI_TIMEOUT_MS } from "../../src/lib/search/gemini";
 import type {
   SearchCriteria,

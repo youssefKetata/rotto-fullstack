@@ -2,7 +2,7 @@ import {
   readShortlist,
   renameShortlist,
   deleteShortlist,
-} from "@/lib/search/shortlists";
+} from "@/lib/data/shortlists";
 import {
   json,
   nameValue,

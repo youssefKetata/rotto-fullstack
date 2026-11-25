@@ -2,6 +2,7 @@ import "server-only";
 
 import { authResponse, isSameOrigin } from "./auth-response";
 import { getRecruiter } from "./supabase/auth";
+import { DataNotFoundError } from "./data/errors";
 import { readRequestBytes, RequestBodyTooLargeError } from "./request-body";
 
 export type RecruiterContext = NonNullable<
@@ -113,6 +114,8 @@ export function uuidValue(value: string) {
 export function apiError(error: unknown): Response {
   if (error instanceof ApiError)
     return json({ error: error.message, code: error.code }, error.status);
+  if (error instanceof DataNotFoundError)
+    return json({ error: error.message, code: "NOT_FOUND" }, 404);
   return json(
     {
       error: "This request couldn't be completed. Please try again.",

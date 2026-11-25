@@ -1,11 +1,11 @@
 import "server-only";
 
-import { getDatabase, type DatabaseTransaction } from "@/lib/database";
-import type { CompanyPlan } from "./contracts";
-import { matchingCandidates } from "./query";
-import { validateSearchFilters, type SearchFilters } from "./schema";
+import { getDatabase, type DatabaseTransaction } from "@/lib/data/pool";
+import type { CompanyPlan } from "@/lib/search/contracts";
+import { matchingCandidates } from "./search-query";
+import { validateSearchFilters, type SearchFilters } from "@/lib/search/schema";
 
-export type { CompanyPlan } from "./contracts";
+export type { CompanyPlan } from "@/lib/search/contracts";
 export type SearchDatabaseErrorCode =
   | "quota"
   | "pending"
