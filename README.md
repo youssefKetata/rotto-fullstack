@@ -1,7 +1,7 @@
 # Rotto assessment
 
 Use Node 24, npm, Make and Docker Desktop. Supabase **2.119.0** and Next.js
-**16.4.0** are locked; no global CLI is needed.
+**16.4.6** are locked; no global CLI is needed.
 
 ```sh
 make setup
