@@ -111,13 +111,19 @@ test("Bearer APIs, company isolation, quota, paging and signed billing", async (
         ? { body: typeof body === "string" ? body : JSON.stringify(body) }
         : {}),
     });
-    const data = await response.json();
+    const raw = await response.text();
+    const data = JSON.parse(raw);
     assert.ok(
       (Array.isArray(status) ? status : [status]).includes(response.status),
       `${method} ${path}: ${JSON.stringify(data)}`,
     );
     assert.match(response.headers.get("cache-control"), /no-store/);
-    return { data, status: response.status, ms: performance.now() - started };
+    return {
+      data,
+      status: response.status,
+      ms: performance.now() - started,
+      bytes: Buffer.byteLength(raw),
+    };
   }
   async function billing(
     created,
@@ -381,17 +387,81 @@ test("Bearer APIs, company isolation, quota, paging and signed billing", async (
         status: 402,
       });
       await request(`/api/search/${search.search_id}`, { as: b, status: 404 });
-      await request(`/api/search/${search.search_id}?page=0`, { status: 400 });
+      const path = `/api/search/${search.search_id}`;
+      for (const query of [
+        "page=0",
+        "page=",
+        "page=-1",
+        "page=1.5",
+        "page=1e2",
+        "page=01",
+        "page=10000000",
+        "page=1&page=2",
+        "view=unknown",
+        "view=rows&view=rows",
+      ]) {
+        await request(`${path}?${query}`, { status: 400 });
+      }
+      const lastPage = Math.ceil(search.total / 20);
+      for (const page of [lastPage + 1, 9999999]) {
+        const missing = await request(`${path}?page=${page}&view=rows`, {
+          status: 404,
+        });
+        assert.equal(missing.data.code, "PAGE_NOT_FOUND");
+      }
+      await request(`${path}?page=2&view=rows`, { as: b, status: 404 });
       const expected =
         await sql`select candidate_id from public.search_results where search_id=${search.search_id} order by position`;
       const ids = [];
       const timings = [];
-      for (let page = 1; page <= Math.ceil(search.total / 20); page++) {
-        const next = await request(
-          `/api/search/${search.search_id}?page=${page}`,
+      const fullTimings = [];
+      let rowsBytes = 0;
+      let fullBytes = 0;
+      for (let page = 1; page <= lastPage; page++) {
+        const pagePath = `${path}?page=${page}`;
+        const rowsPath = `${pagePath}&view=rows`;
+        const rowsFirst = page % 2 === 1;
+        const firstResponse = await request(rowsFirst ? rowsPath : pagePath);
+        const secondResponse = await request(rowsFirst ? pagePath : rowsPath);
+        const [next, full] = rowsFirst
+          ? [firstResponse, secondResponse]
+          : [secondResponse, firstResponse];
+        assert.equal(next.data.page, page);
+        assert.equal(next.data.total, search.total);
+        assert.equal(next.data.search_id, search.search_id);
+        assert.equal(
+          next.data.results.length,
+          Math.min(20, search.total - (page - 1) * 20),
+        );
+        assert.deepEqual(
+          next.data.results,
+          full.data.results.map(({ education, experiences, ...person }) => {
+            assert.ok(Array.isArray(education));
+            return {
+              ...person,
+              experiences: experiences.map(
+                ({
+                  position,
+                  title,
+                  company_name,
+                  company_type,
+                  end_year,
+                }) => ({
+                  position,
+                  title,
+                  company_name,
+                  company_type,
+                  end_year,
+                }),
+              ),
+            };
+          }),
         );
         ids.push(...next.data.results.map((person) => person.id));
         timings.push(next.ms);
+        fullTimings.push(full.ms);
+        rowsBytes += next.bytes;
+        fullBytes += full.bytes;
       }
       assert.equal(new Set(ids).size, search.total);
       assert.deepEqual(
@@ -400,13 +470,61 @@ test("Bearer APIs, company isolation, quota, paging and signed billing", async (
       );
       assert.equal((await request("/api/plan")).data.searches_remaining, 0);
       timings.sort((x, y) => x - y);
+      fullTimings.sort((x, y) => x - y);
+      assert.ok(rowsBytes < fullBytes);
       console.log(
         JSON.stringify({
           paging_samples: timings.length,
           p50_ms: Math.round(timings[Math.floor(timings.length / 2)]),
           p95_ms: Math.round(timings[Math.floor(timings.length * 0.95)]),
+          full_p50_ms: Math.round(
+            fullTimings[Math.floor(fullTimings.length / 2)],
+          ),
+          full_p95_ms: Math.round(
+            fullTimings[Math.floor(fullTimings.length * 0.95)],
+          ),
+          rows_bytes: rowsBytes,
+          full_bytes: fullBytes,
         }),
       );
+    },
+  );
+
+  await t.test(
+    "empty, exact-size, pending and failed result sets",
+    async () => {
+      const pathFor = (id, page) => `/api/search/${id}?page=${page}&view=rows`;
+      for (const [status, total, httpStatus] of [
+        ["completed", 0, 200],
+        ["completed", 20, 200],
+        ["pending", 0, 409],
+        ["failed", 0, 409],
+      ]) {
+        const [row] = await sql`
+        insert into public.searches (company_id, created_by, brief, filters, status, total, completed_at)
+        values (${b.company}, ${b.user}, 'Page boundary fixture', ${sql.json(filters)}, ${status}, ${total},
+          case when ${status} = 'pending' then null else now() end)
+        returning id`;
+        try {
+          if (total)
+            await sql`
+          insert into public.search_results (search_id, candidate_id, position)
+          select ${row.id}, id, row_number() over (order by id) from public.candidates order by id limit ${total}`;
+          const response = await request(pathFor(row.id, 1), {
+            as: b,
+            status: httpStatus,
+          });
+          if (httpStatus === 200) {
+            assert.equal(response.data.results.length, total);
+            await request(pathFor(row.id, 2), { as: b, status: 404 });
+          } else {
+            assert.equal(response.data.code, `SEARCH_${status.toUpperCase()}`);
+            await request(pathFor(row.id, 2), { as: b, status: 409 });
+          }
+        } finally {
+          await sql`delete from public.searches where id = ${row.id}`;
+        }
+      }
     },
   );
 

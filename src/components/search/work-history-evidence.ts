@@ -1,17 +1,16 @@
 import type { SearchExperience } from "@/lib/search/schema";
-import type { Candidate } from "@/lib/search/types";
+import type { CandidateSummary } from "@/lib/search/types";
 
 /** Show an actual job, using the same-record and time scope of the request. */
-export function workHistoryEvidence(
-  candidate: Pick<Candidate, "experiences">,
-  conditions: SearchExperience[] = [],
-) {
+export function workHistoryEvidence<
+  Job extends CandidateSummary["experiences"][number],
+>(candidate: { experiences: Job[] }, conditions: SearchExperience[] = []) {
   const jobs = [...candidate.experiences].sort(
     (a, b) =>
       Number(a.end_year !== null) - Number(b.end_year !== null) ||
       a.position - b.position,
   );
-  const evidence: Candidate["experiences"] = [];
+  const evidence: Job[] = [];
   const includes = (values: string[] | undefined, value: string) =>
     !values ||
     values.some((item) => item.toLowerCase() === value.toLowerCase());

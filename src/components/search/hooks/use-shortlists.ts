@@ -14,7 +14,7 @@ import type {
   ShortlistDetail,
   ShortlistMembership,
 } from "@/lib/search/contracts";
-import type { Candidate } from "@/lib/search/types";
+import type { CandidateSummary } from "@/lib/search/types";
 import { errorMessage as message, type NameAction } from "../workspace-state";
 
 type Options = {
@@ -25,12 +25,14 @@ type Options = {
 /** Owns list loading, membership, and list editing; search quota is unrelated. */
 export function useShortlists({ setError, setNotice }: Options) {
   const [lists, setLists] = useState<Shortlist[]>([]);
-  const [listPeople, setListPeople] = useState<Record<string, Candidate[]>>({});
+  const [listPeople, setListPeople] = useState<
+    Record<string, CandidateSummary[]>
+  >({});
   const [listMemberships, setListMemberships] = useState<
     Record<string, ShortlistMembership[]>
   >({});
   const [activeList, setActiveList] = useState<string | null>(null);
-  const [picker, setPicker] = useState<Candidate | null>(null);
+  const [picker, setPicker] = useState<CandidateSummary | null>(null);
   const [nameAction, setNameAction] = useState<NameAction | null>(null);
   const [deleteList, setDeleteList] = useState<Shortlist | null>(null);
   const [collectionPending, setCollectionPending] = useState(false);
@@ -63,7 +65,7 @@ export function useShortlists({ setError, setNotice }: Options) {
       setPickerPending(false);
     }
   }
-  async function openPicker(person: Candidate) {
+  async function openPicker(person: CandidateSummary) {
     setPicker(person);
     await refreshMemberships();
   }
@@ -75,7 +77,7 @@ export function useShortlists({ setError, setNotice }: Options) {
     membershipQueue.current = next.catch(() => {});
     return next;
   }
-  function restoreRow(listId: string, person: Candidate, index: number) {
+  function restoreRow(listId: string, person: CandidateSummary, index: number) {
     setListPeople((previous) => {
       const people = previous[listId] ?? [];
       if (people.some((item) => item.id === person.id)) return previous;
@@ -86,7 +88,7 @@ export function useShortlists({ setError, setNotice }: Options) {
   }
   function undoRemoval(
     list: Shortlist,
-    person: Candidate,
+    person: CandidateSummary,
     index: number,
     addedAt: string,
     toastId: string | number,
@@ -124,7 +126,11 @@ export function useShortlists({ setError, setNotice }: Options) {
       }
     });
   }
-  function membership(list: Shortlist, person: Candidate, remove: boolean) {
+  function membership(
+    list: Shortlist,
+    person: CandidateSummary,
+    remove: boolean,
+  ) {
     return enqueueMembership(async () => {
       setPickerPending(true);
       setDialogError("");

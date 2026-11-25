@@ -11,7 +11,11 @@ import {
   type SearchDatabaseErrorCode,
 } from "./database";
 import { interpretBrief, assertGeminiConfigured, GeminiError } from "./gemini";
-import type { SearchResponse } from "./contracts";
+import {
+  SEARCH_PAGE_SIZE,
+  type SearchPageRows,
+  type SearchResponse,
+} from "./contracts";
 import { readSearchPage } from "./results";
 import { validateSearchFilters, type SearchFilters } from "./schema";
 
@@ -68,12 +72,10 @@ export async function planFor(context: RecruiterContext) {
   }
 }
 
-export async function readSearch(
-  context: RecruiterContext,
-  id: string,
-  page = 1,
-): Promise<SearchResponse> {
-  const search = await readSearchPage(context.recruiter.id, id, page);
+function requireSearchPage<T extends { status: string; total: number }>(
+  search: T | undefined,
+  page: number,
+): T {
   if (!search)
     throw new ApiError(404, "NOT_FOUND", "This search was not found.");
   if (search.status === "pending")
@@ -88,6 +90,42 @@ export async function readSearch(
       "SEARCH_FAILED",
       "This search did not complete. Please try again.",
     );
+  if (page > Math.max(1, Math.ceil(search.total / SEARCH_PAGE_SIZE))) {
+    throw new ApiError(
+      404,
+      "PAGE_NOT_FOUND",
+      "This search has no results on that page.",
+    );
+  }
+  return search;
+}
+
+export async function readSearchRows(
+  context: RecruiterContext,
+  id: string,
+  page: number,
+): Promise<SearchPageRows> {
+  const search = requireSearchPage(
+    await readSearchPage(context.recruiter.id, id, page, "rows"),
+    page,
+  );
+  return {
+    search_id: search.id,
+    total: search.total,
+    results: search.results,
+    page,
+  };
+}
+
+export async function readSearch(
+  context: RecruiterContext,
+  id: string,
+  page = 1,
+): Promise<SearchResponse> {
+  const search = requireSearchPage(
+    await readSearchPage(context.recruiter.id, id, page, "full"),
+    page,
+  );
   const filters = validateSearchFilters(search.filters);
   if (!filters) throw new Error("Stored search filters are invalid");
   return {

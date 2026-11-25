@@ -32,3 +32,10 @@ export type Candidate = {
     graduation_year: number | null;
   }[];
 };
+
+export type CandidateSummary = Omit<Candidate, "education" | "experiences"> & {
+  experiences: Pick<
+    Candidate["experiences"][number],
+    "position" | "title" | "company_name" | "company_type" | "end_year"
+  >[];
+};

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Popover } from "radix-ui";
-import type { Candidate } from "@/lib/search/types";
+import type { CandidateSummary } from "@/lib/search/types";
 import type { SearchExperience } from "@/lib/search/schema";
 import type { ShortlistMembership } from "@/lib/search/contracts";
 import { workHistoryEvidence } from "./work-history-evidence";
@@ -48,9 +48,9 @@ export function ShortlistButton({
   remove = false,
   disabled = false,
 }: {
-  candidate: Candidate;
+  candidate: CandidateSummary;
   saved: boolean;
-  onToggle: (candidate: Candidate) => void;
+  onToggle: (candidate: CandidateSummary) => void;
   remove?: boolean;
   disabled?: boolean;
 }) {
@@ -162,12 +162,12 @@ export function CandidateRow({
   membership,
   recruiterId,
 }: {
-  candidate: Candidate;
+  candidate: CandidateSummary;
   matched: string[];
   saved: boolean;
   selected: boolean;
-  onOpen: (candidate: Candidate) => void;
-  onToggle: (candidate: Candidate) => void;
+  onOpen: (candidate: CandidateSummary) => void;
+  onToggle: (candidate: CandidateSummary) => void;
   remove?: boolean;
   membershipPending?: boolean;
   workRequirements?: SearchExperience[];

@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { appendSearchPage } from "../../src/components/search/search-pagination";
 import {
   readWorkspaceSession,
   workspaceEntry,
@@ -19,6 +20,34 @@ const entry = (path: string, session = saved) =>
     undefined,
     identity,
   );
+
+test("pagination appends a partial last page and rejects stale or inconsistent pages", () => {
+  const first = {
+    search_id: "search-a",
+    page: 1,
+    total: 22,
+    results: Array.from({ length: 20 }, (_, index) => ({ id: String(index) })),
+  };
+  const last = { ...first, page: 2, results: [{ id: "20" }, { id: "21" }] };
+  const appended = appendSearchPage(first, last);
+  assert.deepEqual(appended.results, [...first.results, ...last.results]);
+  assert.equal(appended.page, 2);
+  for (const invalid of [
+    { ...last, search_id: "search-b" },
+    { ...last, page: 1 },
+    { ...last, page: 3 },
+    { ...last, total: 23 },
+    { ...last, results: [] },
+    { ...last, results: [{ id: "0" }, { id: "21" }] },
+    { ...last, results: [{ id: "20" }, { id: "20" }] },
+  ]) {
+    assert.throws(() => appendSearchPage(first, invalid));
+  }
+  assert.throws(() =>
+    appendSearchPage(appended, { ...last, page: 3, results: [] }),
+  );
+  assert.equal(first.results.length, 20);
+});
 
 test("sign-in starts empty even with a saved search or unfinished draft", () => {
   assert.deepEqual(entry("/?new=1"), { searchId: null, draft: "" });

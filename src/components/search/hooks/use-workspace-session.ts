@@ -8,7 +8,7 @@ import type {
   SavedBrief,
   SearchResponse,
 } from "@/lib/search/contracts";
-import type { Candidate } from "@/lib/search/types";
+import type { Candidate, CandidateSummary } from "@/lib/search/types";
 import {
   errorMessage as message,
   updateWorkspaceUrl,
@@ -19,7 +19,7 @@ import { readWorkspaceSession, workspaceEntry } from "../workspace-session";
 type Setter<T> = Dispatch<SetStateAction<T>>;
 type Options = WorkspaceIdentity & {
   brief: string;
-  search: SearchResponse | null;
+  search: SearchResponse<CandidateSummary> | null;
   previousSearchId: string | null;
   setPreviousSearchId: Setter<string | null>;
   clearSearch: () => void;
@@ -31,7 +31,7 @@ type Options = WorkspaceIdentity & {
   setCandidate: Setter<Candidate | null>;
   setError: Setter<string>;
   accept: (result: SearchResponse) => void;
-  loadList: (id: string, signal?: AbortSignal) => Promise<Candidate[]>;
+  loadList: (id: string, signal?: AbortSignal) => Promise<CandidateSummary[]>;
 };
 
 /** Restores server state and an optional identity-scoped draft, without spending quota. */

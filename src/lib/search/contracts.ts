@@ -1,5 +1,5 @@
 import type { SearchFilters } from "./schema";
-import type { Candidate } from "./types";
+import type { Candidate, CandidateSummary } from "./types";
 
 /** Shared API contracts contain no server code or credentials. */
 export type CompanyPlan = {
@@ -7,15 +7,20 @@ export type CompanyPlan = {
   searches_remaining: number | null;
 };
 
-export type SearchResponse = {
+export type SearchResponse<Person = Candidate> = {
   search_id: string;
   brief: string;
   filters: SearchFilters;
   total: number;
-  results: Candidate[];
+  results: Person[];
   searches_remaining: number | null;
   page: number;
 };
+
+export type SearchPageRows = Pick<
+  SearchResponse<CandidateSummary>,
+  "search_id" | "page" | "total" | "results"
+>;
 
 export type Shortlist = {
   id: string;

@@ -5,12 +5,13 @@ import { SearchApiError, searchApi } from "@/lib/search/browser";
 import type {
   CompanyPlan,
   SearchResponse,
+  SearchPageRows,
   SavedBrief,
 } from "@/lib/search/contracts";
-import { SEARCH_PAGE_SIZE } from "@/lib/search/contracts";
+import { appendSearchPage } from "../search-pagination";
 import type { SearchFilters } from "@/lib/search/schema";
 import { savedSearchKey } from "@/lib/search/saved-search";
-import type { Candidate } from "@/lib/search/types";
+import type { Candidate, CandidateSummary } from "@/lib/search/types";
 import { requestedSkills } from "../filter-summary";
 import {
   errorMessage as message,
@@ -27,7 +28,9 @@ export function useSearchWorkspace({
   recruiterId,
 }: WorkspaceIdentity) {
   const [brief, setBrief] = useState("");
-  const [search, setSearch] = useState<SearchResponse | null>(null);
+  const [search, setSearch] = useState<SearchResponse<CandidateSummary> | null>(
+    null,
+  );
   const [previousSearchId, setPreviousSearchId] = useState<string | null>(null);
   const [filters, setFilters] = useState<SearchFilters | null>(null);
   const [plan, setPlan] = useState<CompanyPlan | null>(null);
@@ -41,7 +44,7 @@ export function useSearchWorkspace({
   const savedBusy = useRef(false);
   const [candidate, setCandidate] = useState<Candidate | null>(null);
   const [drawerSnapshot, setDrawerSnapshot] = useState<{
-    people: Candidate[];
+    people: CandidateSummary[];
     listId: string | null;
   } | null>(null);
 
@@ -62,7 +65,7 @@ export function useSearchWorkspace({
   const { lists, setLists, listPeople, activeList, setActiveList, loadList } =
     shortlists;
   const busy = useRef(false);
-  const pageBusy = useRef(false);
+  const pageRequest = useRef<AbortController | null>(null);
   const saveBusy = useRef(false);
   const lastOperation = useRef<SearchOperation | null>(null);
   const count = useRef<HTMLHeadingElement>(null);
@@ -111,26 +114,38 @@ export function useSearchWorkspace({
         ? "Free search used · Your results and lists stay available."
         : "Your company’s first search is free · 1 search remaining.";
 
-  const accept = useCallback((result: SearchResponse) => {
-    setSearch(result);
-    setPreviousSearchId(result.search_id);
-    setFilters(structuredClone(result.filters));
-    setBrief(result.brief);
-    setPlan({
-      plan: result.searches_remaining === null ? "paid" : "free",
-      searches_remaining: result.searches_remaining,
-    });
-    setView("search");
-    setCandidate(null);
-    setDrawerSnapshot(null);
-    setError("");
+  const cancelPage = useCallback(() => {
+    pageRequest.current?.abort();
+    pageRequest.current = null;
+    setPaging(false);
     setPageError("");
-    updateWorkspaceUrl(result.search_id);
-    setNotice(
-      `${result.total} ${result.total === 1 ? "candidate" : "candidates"} found.`,
-    );
-    requestAnimationFrame(() => count.current?.focus({ preventScroll: true }));
   }, []);
+
+  const accept = useCallback(
+    (result: SearchResponse) => {
+      cancelPage();
+      setSearch(result);
+      setPreviousSearchId(result.search_id);
+      setFilters(structuredClone(result.filters));
+      setBrief(result.brief);
+      setPlan({
+        plan: result.searches_remaining === null ? "paid" : "free",
+        searches_remaining: result.searches_remaining,
+      });
+      setView("search");
+      setCandidate(null);
+      setDrawerSnapshot(null);
+      setError("");
+      updateWorkspaceUrl(result.search_id);
+      setNotice(
+        `${result.total} ${result.total === 1 ? "candidate" : "candidates"} found.`,
+      );
+      requestAnimationFrame(() =>
+        count.current?.focus({ preventScroll: true }),
+      );
+    },
+    [cancelPage],
+  );
   async function refreshPlan() {
     setPlanPending(true);
     try {
@@ -146,14 +161,14 @@ export function useSearchWorkspace({
     }
   }
   const clearSearch = useCallback(() => {
+    cancelPage();
     setSearch(null);
     setFilters(null);
     setView("search");
     setCandidate(null);
     setDrawerSnapshot(null);
     setError("");
-    setPageError("");
-  }, []);
+  }, [cancelPage]);
   const { ready, restoringSearch } = useWorkspaceSession({
     companyId,
     recruiterId,
@@ -172,11 +187,18 @@ export function useSearchWorkspace({
     accept,
     loadList,
   });
-  useEffect(() => () => profileRequest.current?.abort(), []);
+  useEffect(
+    () => () => {
+      profileRequest.current?.abort();
+      pageRequest.current?.abort();
+    },
+    [],
+  );
 
   async function execute(operation: SearchOperation) {
     if (busy.current) return;
     busy.current = true;
+    cancelPage();
     setPending(true);
     setPendingPath(operation.path);
     const saved = savedBriefs.find(
@@ -230,36 +252,40 @@ export function useSearchWorkspace({
     void execute(operation);
   }
   async function more() {
-    if (!search || pageBusy.current || pending) return;
-    pageBusy.current = true;
+    if (
+      !search ||
+      search.results.length >= search.total ||
+      pageRequest.current ||
+      busy.current
+    )
+      return;
+    const controller = new AbortController();
+    pageRequest.current = controller;
     setPaging(true);
     setPageError("");
     const id = search.search_id;
     const nextPage = search.page + 1;
     try {
-      const next = await searchApi<SearchResponse>(
-        `/api/search/${encodeURIComponent(id)}?page=${nextPage}`,
+      const next = await searchApi<SearchPageRows>(
+        `/api/search/${encodeURIComponent(id)}?page=${nextPage}&view=rows`,
+        { signal: controller.signal },
       );
-      setSearch((previous) =>
-        previous?.search_id === id
-          ? {
-              ...previous,
-              results: [...previous.results, ...next.results],
-              page: nextPage,
-            }
-          : previous,
-      );
+      if (controller.signal.aborted) return;
+      const merged = { ...search, ...appendSearchPage(search, next) };
+      setSearch((previous) => (previous === search ? merged : previous));
       setNotice(
-        `${Math.min(nextPage * SEARCH_PAGE_SIZE, next.total)} of ${next.total} candidates shown.`,
+        `${merged.results.length} of ${merged.total} candidates shown.`,
       );
     } catch (cause) {
-      setPageError(message(cause));
+      if (!controller.signal.aborted) setPageError(message(cause));
     } finally {
-      pageBusy.current = false;
-      setPaging(false);
+      if (pageRequest.current === controller) {
+        pageRequest.current = null;
+        setPaging(false);
+      }
     }
   }
-  async function openPerson(person: Candidate) {
+  async function openPerson(person: CandidateSummary) {
     if (!candidate)
       setDrawerSnapshot({
         people: [...visible],
@@ -322,6 +348,7 @@ export function useSearchWorkspace({
   }
   function startOver() {
     if (pending) return;
+    cancelPage();
     setSearch(null);
     setFilters(null);
     setBrief("");
@@ -335,11 +362,13 @@ export function useSearchWorkspace({
     );
   }
   function showLists() {
+    cancelPage();
     setView("shortlists");
     setError("");
     if (activeList) void shortlists.selectList(activeList);
   }
   async function showSaved() {
+    cancelPage();
     setView("saved");
     setError("");
     try {
