@@ -77,7 +77,7 @@ export async function createStripeCheckout(
     mode: "subscription",
     "line_items[0][price]": config.price,
     "line_items[0][quantity]": "1",
-    "payment_method_types[0]": "card",
+    "allowed_payment_method_types[0]": "card",
     "subscription_data[metadata][rotto_company_id]": reservation.company_id,
     client_reference_id: reservation.company_id,
     expires_at: String(Math.floor(reservation.expires_at.getTime() / 1000)),
@@ -89,6 +89,7 @@ export async function createStripeCheckout(
       method: "POST",
       headers: {
         Authorization: `Bearer ${config.key}`,
+        "Stripe-Version": "2026-11-18.endive",
         "Content-Type": "application/x-www-form-urlencoded",
         "Idempotency-Key": `rotto-checkout-${reservation.attempt_id}`,
       },
