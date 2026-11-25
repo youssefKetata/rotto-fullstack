@@ -14,7 +14,9 @@ const log = resolve(tmpdir(), "rotto-next-dev.log");
 function run(script, ...args) {
   const result = spawnSync(process.execPath, [script, ...args], {
     cwd: root,
-    stdio: "inherit",
+    // Supabase prints generated keys on stdout after startup; keep those out of logs.
+    stdio: script === cli ? ["ignore", "pipe", "inherit"] : "inherit",
+    maxBuffer: 16 * 1024 * 1024,
   });
   if (result.error) throw result.error;
   if (result.status !== 0) throw new Error(`${script} failed.`);
@@ -63,6 +65,7 @@ async function main() {
   }
   if (process.argv[2] !== "start") throw new Error("Use setup or start.");
   run(cli, "start");
+  console.log("Development Supabase is running.");
   if (await ready()) return;
   const output = openSync(log, "a", 0o600);
   const child = spawn(
