@@ -31,7 +31,12 @@ export function SearchWorkspace({
   companyId,
   recruiterId,
   demoUpgrade = false,
-}: WorkspaceIdentity & { company?: string; demoUpgrade?: boolean }) {
+  stripeCheckout = false,
+}: WorkspaceIdentity & {
+  company?: string;
+  demoUpgrade?: boolean;
+  stripeCheckout?: boolean;
+}) {
   const workspace = useSearchWorkspace({ companyId, recruiterId });
   const {
     brief: currentBrief,
@@ -804,6 +809,7 @@ export function SearchWorkspace({
       </span>
       <WorkspaceOverlays
         demoUpgrade={demoUpgrade}
+        stripeCheckout={stripeCheckout}
         workspace={workspace}
         onRequirementsChange={updateRequirements}
       />

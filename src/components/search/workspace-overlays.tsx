@@ -18,10 +18,12 @@ export function WorkspaceOverlays({
   workspace,
   onRequirementsChange,
   demoUpgrade,
+  stripeCheckout,
 }: {
   workspace: WorkspaceModel;
   onRequirementsChange: (filters: SearchFilters) => void;
   demoUpgrade: boolean;
+  stripeCheckout: boolean;
 }) {
   const {
     editFilters,
@@ -289,13 +291,27 @@ export function WorkspaceOverlays({
           onClose={() => setUpgrade(false)}
           onRefresh={async () => (await refreshPlan())?.plan ?? null}
           refreshing={planPending}
+          stripeCheckout={stripeCheckout}
           onUpgrade={
-            demoUpgrade
+            stripeCheckout
               ? async () => {
-                  await searchApi("/api/plan/demo-upgrade", { method: "POST" });
-                  return (await refreshPlan())?.plan ?? null;
+                  const { url } = await searchApi<{ url: string }>(
+                    "/api/plan/checkout",
+                    { method: "POST" },
+                  );
+                  window.location.assign(url);
                 }
-              : undefined
+              : demoUpgrade
+                ? async () => {
+                    await searchApi("/api/plan/demo-upgrade", {
+                      method: "POST",
+                    });
+                    if ((await refreshPlan())?.plan !== "paid")
+                      throw new Error(
+                        "We couldn’t confirm the upgrade. Try checking your plan.",
+                      );
+                  }
+                : undefined
           }
         />
       )}

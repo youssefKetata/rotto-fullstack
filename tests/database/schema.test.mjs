@@ -32,6 +32,7 @@ const privateTables = [
   "billing_events",
   "subscriptions",
   "search_executions",
+  "checkout_reservations",
 ];
 
 // Stand-ins for Supabase Auth; application migrations run unchanged.

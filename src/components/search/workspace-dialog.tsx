@@ -162,11 +162,13 @@ export function UpgradeDialog({
   onRefresh,
   refreshing,
   onUpgrade,
+  stripeCheckout,
 }: {
   onClose: () => void;
   onRefresh: () => Promise<"free" | "paid" | null>;
   refreshing: boolean;
-  onUpgrade?: () => Promise<"free" | "paid" | null>;
+  onUpgrade?: () => Promise<void>;
+  stripeCheckout: boolean;
 }) {
   const [feedback, setFeedback] = useState("");
   const [upgrading, setUpgrading] = useState(false);
@@ -174,9 +176,11 @@ export function UpgradeDialog({
     <WorkspaceDialog
       title="Your free search is used"
       description={
-        onUpgrade
-          ? "Activate the demo plan to run more searches and refine your requirements. No payment is required."
-          : "Ask your workspace administrator to activate a paid plan for new searches."
+        stripeCheckout
+          ? "Upgrade your workspace to run more searches and refine your requirements. Stripe shows the price and billing terms before you subscribe."
+          : onUpgrade
+            ? "Activate the demo plan to run more searches and refine your requirements. No payment is required."
+            : "Ask your workspace administrator to activate a paid plan for new searches."
       }
       onClose={onClose}
     >
@@ -202,14 +206,12 @@ export function UpgradeDialog({
                 setUpgrading(true);
                 setFeedback("");
                 try {
-                  if ((await onUpgrade()) !== "paid") {
-                    setFeedback(
-                      "We couldn’t confirm the upgrade. Try checking your plan.",
-                    );
-                  }
-                } catch {
+                  await onUpgrade();
+                } catch (error) {
                   setFeedback(
-                    "We couldn’t activate the demo plan. Please try again.",
+                    error instanceof Error
+                      ? error.message
+                      : "We couldn’t start the upgrade. Please try again.",
                   );
                 } finally {
                   setUpgrading(false);
@@ -218,8 +220,10 @@ export function UpgradeDialog({
             >
               <PendingLabel
                 pending={upgrading}
-                idle="Activate demo plan"
-                loading="Activating…"
+                idle={
+                  stripeCheckout ? "Continue to checkout" : "Activate demo plan"
+                }
+                loading={stripeCheckout ? "Opening checkout…" : "Activating…"}
               />
             </button>
           )}

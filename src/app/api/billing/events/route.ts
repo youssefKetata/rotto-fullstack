@@ -1,4 +1,5 @@
 import { json } from "@/lib/api";
+import { stripeWebhookMode } from "@/lib/checkout";
 import { readRequestBytes, RequestBodyTooLargeError } from "@/lib/request-body";
 import {
   applyBillingEvent,
@@ -8,7 +9,8 @@ import {
 
 export async function POST(request: Request) {
   const secret = process.env.STRIPE_WEBHOOK_SECRET;
-  if (!secret)
+  const stripe = stripeWebhookMode();
+  if (!secret || (stripe && secret === "whsec_rotto_assessment_sample"))
     return json(
       { error: "Billing is not configured.", code: "BILLING_CONFIGURATION" },
       503,
@@ -33,7 +35,12 @@ export async function POST(request: Request) {
     );
   }
   if (
-    !verifyStripeSignature(raw, request.headers.get("stripe-signature"), secret)
+    !verifyStripeSignature(
+      raw,
+      request.headers.get("stripe-signature"),
+      secret,
+      stripe ? Math.floor(Date.now() / 1000) : undefined,
+    )
   ) {
     return json(
       { error: "Invalid Stripe signature.", code: "BAD_SIGNATURE" },
@@ -47,8 +54,9 @@ export async function POST(request: Request) {
     return json({ received: true });
   }
   if (!validBillingEvent(event)) return json({ received: true });
+  if (stripe && event.livemode !== stripe.live) return json({ received: true });
   try {
-    await applyBillingEvent(event);
+    await applyBillingEvent(event, stripe ?? undefined);
   } catch {
     return json(
       {

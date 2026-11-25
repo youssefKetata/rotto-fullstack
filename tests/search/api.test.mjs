@@ -196,6 +196,29 @@ test("Bearer APIs, company isolation, quota, paging and signed billing", async (
   let saved;
   let search;
   await t.test(
+    "checkout requires recruiter access and stays disabled without Stripe configuration",
+    async () => {
+      await request("/api/plan/checkout", {
+        method: "POST",
+        as: null,
+        status: 401,
+      });
+      await request("/api/plan/checkout", {
+        method: "POST",
+        headers: { Origin: "https://other.example" },
+        status: 403,
+      });
+      if (!process.env.STRIPE_SECRET_KEY) {
+        const checkout = await request("/api/plan/checkout", {
+          method: "POST",
+          status: 503,
+        });
+        assert.equal(checkout.data.code, "CHECKOUT_UNAVAILABLE");
+        assert.equal((await request("/api/plan")).data.plan, "free");
+      }
+    },
+  );
+  await t.test(
     "named shortlists and saved briefs persist under RLS",
     async () => {
       list = (

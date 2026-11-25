@@ -27,6 +27,18 @@ Activation requires a loopback Supabase instance.
 To exercise the webhook separately, run
 `node --env-file=.env.local scripts/activate-demo-plan.mjs acme` (or `globex`).
 
+For Stripe Checkout, apply migrations and set `STRIPE_SECRET_KEY`,
+`STRIPE_PRICE_ID` (an active recurring price), `STRIPE_WEBHOOK_SECRET`, and
+`ROTTO_BILLING_ORIGIN` (the app origin without a trailing slash). Start with
+Stripe test mode. Use the same Stripe account and mode for the key, price, and
+webhook. Deliver `customer.subscription.created`,
+`customer.subscription.updated`, and `customer.subscription.deleted` to
+`/api/billing/events`. For loopback development, use
+`stripe listen --forward-to http://localhost:3000/api/billing/events` and use
+the listener's signing secret. A workspace becomes paid after an authenticated
+Stripe event confirms an active subscription. The checkout return page checks
+the workspace's plan while the event is processed.
+
 Search uses one direct request to free-tier **Gemini 3.5 Flash-Lite**, with no
 retries or paid fallback. Interpretation has a 15-second deadline to allow for
 first-connection setup and provider latency; the search reservation lasts 30

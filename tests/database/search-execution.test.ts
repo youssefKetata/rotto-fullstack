@@ -3,6 +3,8 @@ import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 import { getDatabase } from "../../src/lib/database";
+import { applyBillingEvent } from "../../src/lib/billing";
+import { reserveCheckout } from "../../src/lib/checkout";
 import {
   completeSearch,
   failSearch,
@@ -15,6 +17,67 @@ import type {
   SearchFilters,
 } from "../../src/lib/search/schema";
 import { noMatches, withSearchFixture } from "./search-fixture";
+
+test("checkout reservation is shared per company and signed Stripe state controls entitlement", async () => {
+  await withSearchFixture(async (fixture) => {
+    const { userId, companyId, sql, plan } = fixture;
+    const reservations = await Promise.all(
+      Array.from({ length: 5 }, () => reserveCheckout(userId)),
+    );
+    assert.equal(
+      new Set(reservations.map((reservation) => reservation.attempt_id)).size,
+      1,
+    );
+    assert.equal(reservations[0].company_id, companyId);
+    assert.equal((await plan()).plan, "free");
+    const eventId = `evt_${randomUUID()}`;
+    const subscription = `sub_${companyId.replaceAll("-", "")}`;
+    const event = {
+      id: eventId,
+      type: "customer.subscription.updated",
+      created: 1000,
+      livemode: false,
+      data: {
+        object: {
+          object: "subscription",
+          id: subscription,
+          status: "active",
+          metadata: { rotto_company_id: companyId },
+        },
+      },
+    };
+    try {
+      await applyBillingEvent(
+        { ...event, id: eventId + "wrongmode", livemode: true },
+        { live: false },
+      );
+      assert.equal((await plan()).plan, "free");
+      await applyBillingEvent(event, { live: false });
+      await applyBillingEvent(event, { live: false });
+      assert.equal((await plan()).plan, "paid");
+      await assert.rejects(reserveCheckout(userId), {
+        code: "CHECKOUT_NOT_AVAILABLE",
+      });
+      await applyBillingEvent(
+        {
+          ...event,
+          id: eventId + "cancel",
+          created: 1001,
+          type: "customer.subscription.deleted",
+        },
+        { live: false },
+      );
+      assert.equal((await plan()).plan, "free");
+      await sql`update private.checkout_reservations set expires_at = now() - interval '3 minutes' where company_id = ${companyId}`;
+      assert.notEqual(
+        (await reserveCheckout(userId)).attempt_id,
+        reservations[0].attempt_id,
+      );
+    } finally {
+      await sql`delete from private.billing_events where event_id in (${eventId}, ${eventId + "wrongmode"}, ${eventId + "cancel"})`;
+    }
+  });
+});
 
 function filters(criteria: SearchCriteria): SearchFilters {
   return { version: 1, anyOf: [criteria], preferred: [], issues: [] };

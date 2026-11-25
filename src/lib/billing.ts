@@ -43,6 +43,7 @@ export type BillingEvent = {
   type: string;
   created: number;
   data?: unknown;
+  livemode?: unknown;
 };
 
 function objectValue(value: unknown): Record<string, unknown> | null {
@@ -58,6 +59,7 @@ export function verifyStripeSignature(
   body: string | Uint8Array,
   signature: string | null,
   secret: string,
+  now?: number,
 ): boolean {
   if (!signature || signature.length > 2048 || !secret) return false;
   const pieces = signature.split(",").map((entry) => entry.trim().split("="));
@@ -65,6 +67,8 @@ export function verifyStripeSignature(
     .filter(([key]) => key === "t")
     .map(([, value]) => value);
   if (timestamps.length !== 1 || !/^\d{1,16}$/.test(timestamps[0]))
+    return false;
+  if (now !== undefined && Math.abs(now - Number(timestamps[0])) > 300)
     return false;
   const expected = createHmac("sha256", secret)
     .update(`${timestamps[0]}.`)
@@ -93,7 +97,10 @@ export function validBillingEvent(value: unknown): value is BillingEvent {
   );
 }
 
-export async function applyBillingEvent(event: BillingEvent) {
+export async function applyBillingEvent(
+  event: BillingEvent,
+  stripeMode?: { live: boolean },
+) {
   // Signature verification happens in the route before this server-only writer.
   await getDatabase().begin(async (sql) => {
     const inserted =
@@ -106,7 +113,16 @@ export async function applyBillingEvent(event: BillingEvent) {
     const metadata = objectValue(object?.metadata);
     const subscription = object?.id;
     const slug = metadata?.company;
+    const companyId = metadata?.rotto_company_id;
     const status = object?.status;
+    const verifiedStripeCompany =
+      stripeMode &&
+      event.livemode === stripeMode.live &&
+      object?.object === "subscription" &&
+      typeof companyId === "string" &&
+      /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(companyId)
+        ? companyId
+        : null;
     if (
       [
         "customer.subscription.created",
@@ -119,11 +135,18 @@ export async function applyBillingEvent(event: BillingEvent) {
       typeof status === "string" &&
       status.length > 0 &&
       status.length <= 100 &&
-      typeof slug === "string"
+      (stripeMode
+        ? verifiedStripeCompany !== null &&
+          /^sub_[A-Za-z0-9]+$/.test(subscription)
+        : typeof slug === "string")
     ) {
-      const [company] = await sql<
-        { id: string }[]
-      >`select id from public.companies where slug = ${slug}`;
+      const [company] = stripeMode
+        ? await sql<
+            { id: string }[]
+          >`select id from public.companies where id = ${verifiedStripeCompany}`
+        : await sql<
+            { id: string }[]
+          >`select id from public.companies where slug = ${String(slug)}`;
       if (company) {
         await sql`insert into private.company_usage(company_id) values (${company.id}) on conflict do nothing`;
         await sql`select company_id from private.company_usage where company_id = ${company.id} for update`;
