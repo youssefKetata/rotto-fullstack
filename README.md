@@ -3,6 +3,10 @@
 Use Node 24, npm, Make and Docker Desktop. Supabase **2.119.0** and Next.js
 **16.4.6** are locked; no global CLI is needed.
 
+For a laptop without Docker or enough memory for local services, use the
+[cloud development environment](docs/cloud-development.md). The app, database,
+and automated checks run on GitHub's machines.
+
 ```sh
 make setup
 make dev

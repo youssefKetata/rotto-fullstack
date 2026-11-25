@@ -17,6 +17,7 @@
     "db:seed": "node scripts/seed.mjs",
     "db:types": "supabase gen types typescript --local --schema public > src/lib/supabase/database.types.ts && prettier --write src/lib/supabase/database.types.ts",
     "typecheck": "tsc --noEmit",
+    "check:cloud": "node scripts/cloud-checks.mjs",
     "test:http": "node --conditions=react-server --import tsx --test tests/http/request-body.test.ts",
     "format:check": "prettier --check \"src/**/*.{ts,tsx,css}\" \"tests/**/*.ts\" eslint.config.mjs tsconfig.json package.json"
   },

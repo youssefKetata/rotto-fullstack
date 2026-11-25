@@ -1,0 +1,31 @@
+{
+  "name": "Rotto cloud development",
+  "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
+  "features": {
+    "ghcr.io/devcontainers/features/node:2": {
+      "version": "24",
+      "pnpmVersion": "none"
+    },
+    "ghcr.io/devcontainers/features/docker-in-docker:4": {},
+    "ghcr.io/devcontainers/features/sshd:1": {}
+  },
+  "hostRequirements": {
+    "cpus": 2,
+    "memory": "8gb",
+    "storage": "32gb"
+  },
+  "forwardPorts": [3000, 54321, 54323],
+  "portsAttributes": {
+    "3000": { "label": "Rotto", "onAutoForward": "silent" },
+    "54321": { "label": "Development Supabase API", "onAutoForward": "silent" },
+    "54323": {
+      "label": "Development Supabase Studio",
+      "onAutoForward": "silent"
+    }
+  },
+  "otherPortsAttributes": { "onAutoForward": "ignore" },
+  "postCreateCommand": "node scripts/cloud-environment.mjs setup",
+  "postStartCommand": "node scripts/cloud-environment.mjs start",
+  "waitFor": "postCreateCommand",
+  "remoteUser": "vscode"
+}

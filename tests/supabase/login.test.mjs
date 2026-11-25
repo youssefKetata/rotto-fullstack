@@ -4,7 +4,9 @@ import { randomUUID } from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
 import { createServerClient } from "@supabase/ssr";
 
-const base = "http://localhost:3000";
+const base = process.env.ROTTO_TEST_BASE_URL ?? "http://localhost:3000";
+const loopback = new URL(base);
+loopback.hostname = "127.0.0.1";
 function login(body, headers = {}, requestBase = base) {
   return fetch(`${requestBase}/api/auth/login`, {
     method: "POST",
@@ -80,8 +82,8 @@ test("login rejects invalid input, wrong credentials and cross-origin requests",
 test("auth endpoints accept public browser origins and reject cross-origin requests behind a proxy", async () => {
   for (const { url, origin, headers } of [
     {
-      url: "http://127.0.0.1:3000",
-      origin: "http://127.0.0.1:3000",
+      url: loopback.origin,
+      origin: loopback.origin,
       headers: {},
     },
     {
